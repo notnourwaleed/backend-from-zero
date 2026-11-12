@@ -80,6 +80,16 @@ code, pre, kbd, .CodeMirror, .blanks input, .reqbar, .tree, .console { font-vari
 .icon-btn { background: none; border: 1px solid var(--border); color: var(--text); border-radius: 8px; height: 34px; min-width: 34px; cursor: pointer; font-size: 16px; }
 .icon-btn:hover { background: var(--surface-2); }
 .menu-btn { display: none; }
+.mode-switch { display: inline-flex; border: 1px solid var(--border); border-radius: 10px; overflow: hidden; flex: none; }
+.mode-switch button { font: inherit; font-size: 13.5px; font-weight: 600; border: 0; background: var(--surface); color: var(--muted); padding: 6px 11px; cursor: pointer; white-space: nowrap; }
+.mode-switch button:hover { color: var(--text); }
+.mode-switch button.on { background: var(--accent); color: var(--accent-text); }
+.teach-cta .btn { margin-left: 4px; }
+@media (max-width: 520px) {
+  .brand { font-size: 0; gap: 0; }
+  .brand-mark { font-size: 14px; }
+  .mode-switch button { padding: 6px 8px; font-size: 12.5px; }
+}
 
 .layout { display: grid; grid-template-columns: 280px minmax(0, 1fr); min-height: calc(100vh - 56px); }
 .sidebar {

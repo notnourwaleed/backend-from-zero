@@ -79,6 +79,40 @@
   }
 
   // ---------- layout ----------
+  // ---------- teacher mode (the main mode) / read mode ----------
+  function getMode() { try { return localStorage.getItem('bfz-mode') || 'teach'; } catch (e) { return 'teach'; } }
+  function setMode(m) { try { localStorage.setItem('bfz-mode', m); } catch (e) { /* ignore */ } paintMode(); }
+  function paintMode() {
+    const m = getMode();
+    $$('.mode-switch button').forEach(b => { b.classList.toggle('on', b.dataset.mode === m); b.setAttribute('aria-pressed', b.dataset.mode === m); });
+  }
+  function modeSwitch() {
+    const sw = h('div', { class: 'mode-switch', role: 'group', 'aria-label': 'Learning mode' },
+      h('button', { 'data-mode': 'teach', title: 'A voice explains each step with animations', onclick: () => { setMode('teach'); openTeacher(); } }, '🎓 Teacher'),
+      h('button', { 'data-mode': 'read', title: 'Read the page yourself', onclick: () => { setMode('read'); if (window.BFZTeacher) window.BFZTeacher.close(); } }, '📖 Read'));
+    setTimeout(paintMode, 0);
+    return sw;
+  }
+  document.addEventListener('bfz:mode', paintMode);
+  let teacherLoading = null;
+  function loadTeacher() {
+    if (!teacherLoading) {
+      document.head.append(h('link', { rel: 'stylesheet', href: 'assets/teacher.css' }));
+      teacherLoading = loadScript('assets/teacher-lessons.js').then(() => loadScript('assets/teacher.js'))
+        .catch(e => { teacherLoading = null; throw e; });
+    }
+    return teacherLoading;
+  }
+  function openTeacher(opts) {
+    // warm up speech inside the click, so browsers allow the voice later
+    try { if (window.speechSynthesis && opts && opts.autostart) window.speechSynthesis.speak(new SpeechSynthesisUtterance('')); } catch (e) { /* ignore */ }
+    loadTeacher().then(() => {
+      if (!window.BFZTeacher.has(PAGE)) return;
+      window.BFZTeacher.open(PAGE, opts);
+    }).catch(e => alert('Teacher mode could not load: ' + e.message));
+  }
+  function solved(el) { if (el) el.dispatchEvent(new CustomEvent('bfz:solved', { bubbles: true })); }
+
   function toggleTheme() {
     const dark = document.documentElement.dataset.theme
       ? document.documentElement.dataset.theme === 'dark'
@@ -96,6 +130,7 @@
       h('button', { class: 'icon-btn menu-btn', 'aria-label': 'Open chapter menu', onclick: () => document.body.classList.toggle('nav-open') }, '☰'),
       h('a', { class: 'brand', href: 'index.html' }, h('span', { class: 'brand-mark' }, '{ }'), 'Backend from Zero'),
       h('span', { class: 'spacer' }),
+      modeSwitch(),
       h('button', { class: 'icon-btn', title: 'Light / dark', 'aria-label': 'Switch light or dark theme', onclick: toggleTheme }, '◐'));
     const nav = h('nav', { class: 'sidebar', 'aria-label': 'Chapters' },
       h('ol', null, CHAPTERS.map(c => h('li', {
@@ -148,6 +183,7 @@
           b.classList.add('right');
           fb.className = 'feedback good';
           fb.textContent = '✓ Correct!';
+          solved(q);
           if (explain) explain.hidden = false;
         } else {
           b.classList.add('wrong');
@@ -185,6 +221,7 @@
         const all = ok === inputs.length;
         out.className = 'blank-result ' + (all ? 'good' : 'bad');
         out.textContent = all ? '✓ All correct!' : `${ok} of ${inputs.length} correct — keep going`;
+        if (all) solved(box);
       }
       box.append(h('div', { class: 'row' },
         h('button', { class: 'btn', onclick: check }, 'Check'),
@@ -877,6 +914,7 @@
       if (!this.entry) this.entry = this.files[0].name;
       const t = $(':scope > script.tests', box);
       this.tests = t ? t.textContent : '';
+      if (/_test\s*\(/.test(this.tests)) box.dataset.checks = '1';
       this.solutions = {};
       $$(':scope > script.solution', box).forEach(s => { this.solutions[s.dataset.file || this.files[0].name] = dedent(s.textContent); });
       const tr = $(':scope > script.tries', box);
@@ -964,7 +1002,7 @@
       this.render(sim, r);
       this.runBtn.disabled = false;
       const allPass = r.entryOk && r.results.length > 0 && r.results.every(x => x.pass);
-      if (allPass && !useSolution) { store.set(this.solvedKey, true); this.markSolved(); }
+      if (allPass && !useSolution) { store.set(this.solvedKey, true); this.markSolved(); solved(this.box); }
       if (this.reqbar) this.reqbar.enable(!!this.sim);
       return { ok: r.hadTests ? allPass : r.entryOk, results: r.results, logs: sim.logs };
     }
@@ -1087,6 +1125,7 @@
       const ta = $('textarea', box);
       this.starter = dedent(ta ? ta.value : '');
       this.solution = box.dataset.solution || '';
+      if (this.solution) box.dataset.checks = '1';
       this.check = box.dataset.check || '';
       this.ex = box.closest('.exercise');
       this.solvedKey = `solved:${PAGE}#${this.id}`;
@@ -1148,7 +1187,7 @@
           missing: 'Not yet: your SQL did not return a result table.',
         }[verdict];
         sec.append(h('div', { class: ok ? 'all-pass' : 'status bad', style: 'margin-top:8px' }, msg));
-        if (ok && !useSolution) { store.set(this.solvedKey, true); this.markSolved(); }
+        if (ok && !useSolution) { store.set(this.solvedKey, true); this.markSolved(); solved(this.box); }
       }
       this.status.className = 'status ' + (r.error ? 'bad' : '');
       this.status.textContent = r.error ? 'SQL error' : '';
@@ -1251,7 +1290,15 @@
     const anchor = $('main .lead') || $('main h1');
     if (anchor && $$('.exercise .runner, .exercise .sqlbox').length) anchor.after(h('p', { class: 'ex-progress', id: 'ex-progress' }));
     updateExProgress();
-    if (SELFTEST) selfTest();
+    if (SELFTEST) { selfTest(); return; }
+    // Teacher mode is the main mode: show the lesson's start screen right away.
+    // (Speech needs a click, so it starts when the student presses "Start lesson".)
+    const anchor2 = $('main .lead');
+    if (anchor2) anchor2.after(h('div', { class: 'callout analogy teach-cta' },
+      h('span', { class: 'label' }, '🎓 Teacher mode'),
+      h('p', null, 'A voice explains this page step by step with animations, and waits for you at every practice. ',
+        h('button', { class: 'btn small', onclick: () => { setMode('teach'); openTeacher(); } }, '▶ Start the lesson'))));
+    if (getMode() === 'teach' && !/[?&]read\b/.test(location.search)) openTeacher();
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init); else init();
 })();
