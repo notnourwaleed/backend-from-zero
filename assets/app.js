@@ -81,6 +81,89 @@
   // ---------- layout ----------
   // ---------- teacher mode (the main mode) / read mode ----------
   function getMode() { try { return localStorage.getItem('bfz-mode') || 'teach'; } catch (e) { return 'teach'; } }
+  function hasChosenMode() { try { return localStorage.getItem('bfz-mode') !== null; } catch (e) { return false; } }
+
+  // ---------- first visit: choose Teacher mode or Read mode ----------
+  function teacherCover() {
+    const words = 'Here is the path of every request…'.split(' ');
+    return h('div', { class: 'mc-teach', 'aria-hidden': 'true' },
+      h('div', { class: 'mc-t-head' }, h('span', { class: 'mc-pill' }, '🎓 Teacher mode'), h('span', { class: 'mc-t-title' }, 'How the web works'), h('span', { class: 'mc-t-x' }, '📖 Read mode')),
+      h('div', { class: 'mc-t-stage' },
+        h('div', { class: 'mc-node a' }, h('b', null, '🧑‍💻'), h('span', null, 'Client')),
+        h('div', { class: 'mc-node w' }, h('b', null, '🧭'), h('span', null, 'Route')),
+        h('div', { class: 'mc-node g' }, h('b', null, '⚙️'), h('span', null, 'Controller')),
+        h('div', { class: 'mc-node p' }, h('b', null, '🗄️'), h('span', null, 'MySQL')),
+        h('span', { class: 'mc-packet' }, 'GET /users/3')),
+      h('div', { class: 'mc-t-cap' },
+        h('span', { class: 'mc-av' }, '🧑‍🏫', h('i', { class: 'mc-eq' }, h('i'), h('i'), h('i'))),
+        h('span', { class: 'mc-words' }, words.map((w, i) => h('span', { style: `animation-delay:${0.35 * i}s` }, w + ' ')))),
+      h('div', { class: 'mc-t-ctl' }, h('i', { class: 'mc-btn' }, '⏮'), h('i', { class: 'mc-btn on' }, '⏸'), h('i', { class: 'mc-btn' }, '⏭'),
+        h('span', { class: 'mc-dots' }, [0, 1, 2, 3, 4, 5, 6].map(i => h('i', { class: i < 2 ? 'done' : i === 2 ? 'on' : '' }))), h('i', { class: 'mc-btn' }, '🔊')));
+  }
+  function readCover() {
+    return h('div', { class: 'mc-read', 'aria-hidden': 'true' },
+      h('div', { class: 'mc-r-top' }, h('span', { class: 'brand-mark' }, '{ }'), h('span', null, 'Backend from Zero')),
+      h('div', { class: 'mc-r-body' },
+        h('div', { class: 'mc-r-side' }, ['Start here', 'Set up', 'JavaScript', 'How the web works', 'First server', 'Routes', 'Async & MySQL'].map((t, i) => h('div', { class: i === 3 ? 'on' : '' }, h('i', null, i ? String(i - 1) : '→'), t))),
+        h('div', { class: 'mc-r-main' },
+          h('div', { class: 'mc-r-scroll' },
+            h('div', { class: 'mc-r-kicker' }, 'CHAPTER 2'),
+            h('div', { class: 'mc-r-h1' }, 'How the web works'),
+            h('div', { class: 'mc-r-p' }), h('div', { class: 'mc-r-p short' }),
+            h('div', { class: 'mc-r-code' }, h('div', null, h('span', { class: 'k' }, 'app'), '.get(', h('span', { class: 's' }, "'/users'"), ', …)'), h('div', null, '  res.', h('span', { class: 'k' }, 'json'), '(users)')),
+            h('div', { class: 'mc-r-p' }),
+            h('div', { class: 'mc-r-quiz' }, h('div', { class: 'mc-r-q' }, 'Which status means “created”?'), h('div', { class: 'mc-r-opt' }, '200'), h('div', { class: 'mc-r-opt ok' }, '201 ✓'), h('div', { class: 'mc-r-opt' }, '404')),
+            h('div', { class: 'mc-r-p' }), h('div', { class: 'mc-r-p short' })))));
+  }
+  function showChooser() {
+    loadTeacher().catch(() => { /* loaded again on demand */ });
+    let choice = 'teach';
+    const cards = {};
+    const card = (mode, title, desc, cover, badge) => {
+      const c = h('button', { class: 'mc-card', type: 'button', role: 'radio', 'data-mode': mode, onclick: () => select(mode) },
+        h('div', { class: 'mc-cover' }, cover),
+        h('div', { class: 'mc-info' },
+          h('div', { class: 'mc-title' }, h('span', { class: 'mc-radio' }), title, badge ? h('span', { class: 'mc-badge' }, badge) : null),
+          h('p', { class: 'mc-desc' }, desc)));
+      cards[mode] = c;
+      return c;
+    };
+    const startBtn = h('button', { class: 'mc-start', type: 'button' });
+    const select = (m) => {
+      choice = m;
+      Object.entries(cards).forEach(([k, c]) => { c.classList.toggle('on', k === m); c.setAttribute('aria-checked', k === m); });
+      startBtn.textContent = '▶ Start lessons';
+    };
+    const modal = h('div', { class: 'mc-overlay' },
+      h('div', { class: 'mc-modal', role: 'dialog', 'aria-modal': 'true', 'aria-labelledby': 'mc-h' },
+        h('div', { class: 'mc-head' },
+          h('div', { class: 'mc-kicker' }, 'Welcome to Backend from Zero'),
+          h('h2', { id: 'mc-h' }, 'How do you want to learn?'),
+          h('p', null, 'Pick one. You can change it any time with the switch at the top of every page.')),
+        h('div', { class: 'mc-cards', role: 'radiogroup', 'aria-label': 'Learning mode' },
+          card('teach', '🎓 Teacher mode', 'A voice explains every step with animations, and stops at each practice to wait for you. Turn your sound on.', teacherCover(), 'Recommended'),
+          card('read', '📖 Read mode', 'Read the chapters at your own speed, and do the quizzes and code exercises whenever you like.', readCover())),
+        h('div', { class: 'mc-foot' }, startBtn)));
+    select('teach');
+    startBtn.addEventListener('click', () => {
+      // warm up the voice inside this click so the browser allows speech
+      try { if (choice === 'teach' && window.speechSynthesis) window.speechSynthesis.speak(new SpeechSynthesisUtterance('')); } catch (e) { /* ignore */ }
+      setMode(choice);
+      modal.remove();
+      document.body.classList.remove('mc-lock');
+      if (choice === 'teach') openTeacher({ autostart: true });
+      else {
+        const sw = $('.mode-switch');
+        if (sw) { sw.classList.add('mc-pulse'); setTimeout(() => sw.classList.remove('mc-pulse'), 4200); }
+      }
+    });
+    modal.addEventListener('keydown', e => {
+      if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') { e.preventDefault(); select(choice === 'teach' ? 'read' : 'teach'); cards[choice].focus(); }
+    });
+    document.body.append(modal);
+    document.body.classList.add('mc-lock');
+    setTimeout(() => startBtn.focus(), 50);
+  }
   function setMode(m) { try { localStorage.setItem('bfz-mode', m); } catch (e) { /* ignore */ } paintMode(); }
   function paintMode() {
     const m = getMode();
@@ -1298,7 +1381,9 @@
       h('span', { class: 'label' }, '🎓 Teacher mode'),
       h('p', null, 'A voice explains this page step by step with animations, and waits for you at every practice. ',
         h('button', { class: 'btn small', onclick: () => { setMode('teach'); openTeacher(); } }, '▶ Start the lesson'))));
-    if (getMode() === 'teach' && !/[?&]read\b/.test(location.search)) openTeacher();
+    if (/[?&]read\b/.test(location.search)) return;
+    if (!hasChosenMode()) showChooser();
+    else if (getMode() === 'teach') openTeacher();
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init); else init();
 })();
