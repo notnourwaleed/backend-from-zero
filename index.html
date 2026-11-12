@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Backend from Zero</title>
+<meta name="description" content="Learn backend JavaScript from zero: Node.js, Express and MySQL, with practice you write yourself in the browser.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=JetBrains+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.css">
+<link rel="stylesheet" href="assets/style.css">
+<script>try{var t=localStorage.getItem('bfz-theme');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body data-page="index.html">
+<main>
+  <section class="hero">
+    <div class="kicker">Node.js · Express · MySQL</div>
+    <h1>Backend from Zero</h1>
+    <p class="lead">Learn how to build a real backend API in JavaScript — step by step, with no experience needed. You read a little, then <strong>you write the code yourself</strong>, right here in the page.</p>
+  </section>
+
+  <h2>What you will be able to build</h2>
+  <p>By the end you can build a <strong>travel API</strong> from an empty folder. It's a server that other programs (a website, an app) talk to. It keeps users, trips and reviews in a MySQL database:</p>
+  <table>
+    <thead><tr><th>Request</th><th>What it does</th></tr></thead>
+    <tbody>
+      <tr><td><code>POST /auth/register</code></td><td>Create an account (password stored safely with bcrypt)</td></tr>
+      <tr><td><code>POST /auth/login</code></td><td>Log in with email + password</td></tr>
+      <tr><td><code>GET /users</code>, <code>GET /users/:id</code></td><td>Read users</td></tr>
+      <tr><td><code>POST</code> / <code>PUT</code> / <code>DELETE /users/:id</code></td><td>Create, change and delete users</td></tr>
+      <tr><td><code>GET /trips</code>, <code>GET /trips/:id</code></td><td>Read trips (and remember the last one you viewed with a cookie)</td></tr>
+      <tr><td><code>GET /trips/reviews</code></td><td>Join three tables: which user rated which trip</td></tr>
+    </tbody>
+  </table>
+  <p>Once you can build this one, you can build the same thing for <em>any</em> topic: books, movies, events, a shop… Chapter 9 shows you how to change it to your own topic.</p>
+
+  <h2>How this site works</h2>
+  <div class="kinds">
+    <div class="kind"><b>📖 Read</b><span>Short explanations in simple words, with everyday comparisons.</span></div>
+    <div class="kind"><b>❓ Quiz</b><span>Click an answer. You get told why right away.</span></div>
+    <div class="kind"><b>✏️ Fill the blanks</b><span>Type the missing piece of code, then press Check.</span></div>
+    <div class="kind"><b>▶ Code playground</b><span>Write real code and run it. Checks tell you what works.</span></div>
+    <div class="kind"><b>🗄️ SQL playground</b><span>Run real SQL on a practice database.</span></div>
+    <div class="kind"><b>💻 On your computer</b><span>Build the real project step by step, in VS Code.</span></div>
+  </div>
+
+  <div class="callout tip">
+    <span class="label">The golden rule</span>
+    <p>Every exercise has <strong>hints</strong> and a <strong>solution</strong>, and they are hidden on purpose. Try first. Being stuck for 10 minutes and then getting it teaches you much more than reading the answer. Open one hint at a time.</p>
+  </div>
+
+  <div class="callout note">
+    <span class="label">About the playgrounds</span>
+    <p>The code playgrounds run a <strong>simulator</strong> of Node.js + Express + MySQL inside your browser, so you can practise without installing anything. For everything in this course it behaves like the real thing. Still, always build the real project on your computer too — that's what the <span class="ex-tag pc">On your computer</span> tasks are for.</p>
+  </div>
+
+  <h2>Chapters</h2>
+  <p>Go in order: each chapter uses the ones before it. Your progress, checkboxes and code are saved <strong>in this browser only</strong>.</p>
+  <div class="cards" id="chapter-cards"></div>
+
+  <div class="callout tip">
+    <span class="label">Got lost copying the project in the lectures?</span>
+    <p>Open <a href="course-project.html"><strong>The lecture project</strong></a>. It builds the exact project from class, but each file is written once, in its final form, in the order you'd build it, with a check after every file. Each part links back to the chapter that explains it.</p>
+  </div>
+
+  <h2>If you are completely lost right now</h2>
+  <p>That's normal. Backend feels confusing because there are many new things at the same time: the terminal, Node, Express, SQL, async… This site separates them and teaches <strong>one thing at a time</strong>. Start with <a href="00-setup.html">Chapter 0</a> even if you think you know it — it's quick, and it makes sure your computer is ready.</p>
+</main>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/javascript/javascript.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/sql/sql.min.js"></script>
+<script src="assets/app.js"></script>
+</body>
+</html>

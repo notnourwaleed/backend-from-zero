@@ -1,0 +1,604 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Your First Express Server · Backend from Zero</title>
+<meta name="description" content="Build a full users API with Express in one file: GET, POST, PUT, DELETE.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=JetBrains+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.css">
+<link rel="stylesheet" href="assets/style.css">
+<script>try{var t=localStorage.getItem('bfz-theme');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body data-page="03-first-server.html">
+<main>
+<div class="kicker">Chapter 3 · course week 4</div>
+<h1>Your first Express server</h1>
+<p class="lead">Express is a package that makes building a server easy. In this chapter you build a complete users API in one file, with the data in a simple array.</p>
+
+<h2 id="setup">Make the project</h2>
+<div class="exercise">
+  <span class="ex-tag pc">On your computer</span>
+  <ol class="steps">
+    <li>Make a new folder <code>first-server</code> and open it in VS Code (<strong>File → Open Folder</strong>).</li>
+    <li>Open the terminal (<kbd>Ctrl</kbd>+<kbd>`</kbd>) and run:
+<pre><code class="language-bash">npm init -y
+npm install express</code></pre></li>
+    <li>Make a new file <code>server.js</code>. You'll fill it in during this chapter.</li>
+  </ol>
+</div>
+
+<h2 id="smallest">The smallest server, line by line</h2>
+<div class="file-label">server.js</div>
+<pre><code class="language-javascript">const express = require('express');   // 1. load the Express package
+const app = express();                 // 2. create your app (your server)
+app.use(express.json());               // 3. let the app read JSON bodies
+
+const PORT = 3000;                     // 4. which "door" to listen at
+const HOSTNAME = '127.0.0.1';          //    on this computer
+
+app.get('/hello', (req, res) =&gt; {      // 5. WHEN someone sends GET /hello…
+  res.status(200).json({ message: 'Hello world' });   // …answer with this
+});
+
+app.listen(PORT, HOSTNAME, () =&gt; {     // 6. start listening for requests
+  console.log(`Server is running at http://${HOSTNAME}:${PORT}`);
+});</code></pre>
+<ol>
+  <li><code>require('express')</code> loads the package you installed with npm.</li>
+  <li><code>express()</code> creates the app. Everything else is added to <code>app</code>.</li>
+  <li><code>app.use(express.json())</code> — without this line, <code>req.body</code> is <code>undefined</code>. Always add it.</li>
+  <li>The port can be any free number, like 3000 or 5000.</li>
+  <li><code>app.get(path, function)</code> adds a <strong>route</strong>: a method + path, and the function to run. The function always gets two things:
+    <ul>
+      <li><code>req</code> (request) — what the client sent: <code>req.params</code>, <code>req.body</code>, <code>req.query</code></li>
+      <li><code>res</code> (response) — what you use to answer: <code>res.status(code).json(data)</code></li>
+    </ul></li>
+  <li><code>app.listen</code> starts the server. The function runs once it's ready.</li>
+</ol>
+
+<h3>Run it</h3>
+<pre><code class="language-bash">node server.js</code></pre>
+<p>You see <code>Server is running at http://127.0.0.1:3000</code> and the terminal seems “stuck”. That's correct! The server is waiting for requests. Open your browser at <strong>http://127.0.0.1:3000/hello</strong> and you'll see the JSON.</p>
+<div class="callout warn"><span class="label">The #1 beginner mistake</span>
+<p>When you change your code, the running server does <strong>not</strong> notice. You must stop it (<kbd>Ctrl</kbd>+<kbd>C</kbd>) and start it again (<kbd>↑</kbd> then <kbd>Enter</kbd>).</p>
+<p>Or run it in <strong>watch mode</strong> and it restarts by itself every time you save:</p>
+<pre><code class="language-bash">node --watch server.js</code></pre></div>
+
+<div class="exercise">
+  <span class="ex-tag">Practice 3.1</span>
+  <h4>Your first route</h4>
+  <p>Add the <code>GET /hello</code> route, then press <strong>Run</strong>. When the server is running, use the request box below the code to send <code>GET /hello</code> — just like Postman.</p>
+  <div class="runner" id="ex-hello" data-express>
+<textarea data-file="server.js">
+const express = require('express');
+const app = express();
+app.use(express.json());
+
+const PORT = 3000;
+const HOSTNAME = '127.0.0.1';
+
+// TODO: add a GET route for '/hello' that answers with status 200
+//       and the JSON { message: 'Hello world' }
+
+
+app.listen(PORT, HOSTNAME, () => {
+  console.log(`Server is running at http://${HOSTNAME}:${PORT}`);
+});
+</textarea>
+<script type="text/plain" class="tests">
+_test('GET /hello answers with status 200', async () => _eq((await _req('GET', '/hello')).status, 200, 'status'));
+_test('the body is { message: "Hello world" }', async () => _eq((await _req('GET', '/hello')).body, { message: 'Hello world' }, 'body'));
+</script>
+<script type="text/plain" class="tries">
+GET /hello
+GET /goodbye
+</script>
+<script type="text/plain" class="solution">
+const express = require('express');
+const app = express();
+app.use(express.json());
+
+const PORT = 3000;
+const HOSTNAME = '127.0.0.1';
+
+app.get('/hello', (req, res) => {
+  res.status(200).json({ message: 'Hello world' });
+});
+
+app.listen(PORT, HOSTNAME, () => {
+  console.log(`Server is running at http://${HOSTNAME}:${PORT}`);
+});
+</script>
+  </div>
+  <p>Also try <code>GET /goodbye</code>: you get <code>404 Cannot GET /goodbye</code>. That's Express saying “I have no route for that”.</p>
+</div>
+
+<h2 id="get-all">Read all users: GET /users</h2>
+<p>Until Chapter 5, our “database” is an array in the file. (It resets every time the server restarts — that's why real apps use MySQL.)</p>
+<p>A good habit from the course: always answer with the <strong>same shape</strong> of object, so the client knows what to expect:</p>
+<pre><code class="language-javascript">res.status(200).json({
+  status: 'success',
+  message: 'Users retrieved successfully',
+  results: users.length,
+  data: users
+});</code></pre>
+
+<div class="exercise">
+  <span class="ex-tag">Practice 3.2</span>
+  <div class="runner" id="ex-getall" data-express>
+<textarea data-file="server.js">
+const express = require('express');
+const app = express();
+app.use(express.json());
+
+const users = [
+  { id: 1, username: 'john_doe', password: 'password123', role: 'user' },
+  { id: 2, username: 'jane_smith', password: 'securepass', role: 'user' },
+  { id: 3, username: 'admin_user', password: 'adminpass', role: 'admin' }
+];
+
+// TODO: GET /users → status 200 and
+// { status: 'success', results: <number of users>, data: <the users array> }
+
+
+app.listen(3000, '127.0.0.1', () => {
+  console.log('Server is running on port 3000');
+});
+</textarea>
+<script type="text/plain" class="tests">
+_test('GET /users answers 200', async () => _eq((await _req('GET', '/users')).status, 200, 'status'));
+_test('body.status is "success"', async () => _eq((await _req('GET', '/users')).body.status, 'success', 'body.status'));
+_test('body.results is 3', async () => _eq((await _req('GET', '/users')).body.results, 3, 'body.results'));
+_test('body.data is the array of 3 users', async () => _eq(((await _req('GET', '/users')).body.data || []).map(u => u.id), [1, 2, 3], 'ids in body.data'));
+</script>
+<script type="text/plain" class="tries">
+GET /users
+</script>
+<script type="text/plain" class="solution">
+const express = require('express');
+const app = express();
+app.use(express.json());
+
+const users = [
+  { id: 1, username: 'john_doe', password: 'password123', role: 'user' },
+  { id: 2, username: 'jane_smith', password: 'securepass', role: 'user' },
+  { id: 3, username: 'admin_user', password: 'adminpass', role: 'admin' }
+];
+
+app.get('/users', (req, res) => {
+  res.status(200).json({
+    status: 'success',
+    results: users.length,
+    data: users
+  });
+});
+
+app.listen(3000, '127.0.0.1', () => {
+  console.log('Server is running on port 3000');
+});
+</script>
+  </div>
+</div>
+
+<h2 id="get-one">Read one user: GET /users/:id</h2>
+<p>The <code>:id</code> in the path is a <strong>route parameter</strong> — a placeholder. For <code>GET /users/2</code>, Express puts <code>"2"</code> in <code>req.params.id</code>.</p>
+<p>Remember Chapter 1: <code>"2"</code> is text! Turn it into a number with <code>Number(req.params.id)</code> before comparing with <code>===</code>.</p>
+<div class="callout danger"><span class="label">Always return when you answer early</span>
+<pre><code class="language-javascript">if (users[i].id === id) {
+  return res.status(200).json({ data: users[i] });   // ← "return" stops the function here
+}
+// ... more code ...
+return res.status(404).json({ message: 'User not found' });</code></pre>
+<p>Without <code>return</code>, the code keeps going and tries to send a <em>second</em> answer. You get the famous error <strong>“Cannot set headers after they are sent to the client”</strong>. One request = one response.</p></div>
+
+<div class="exercise">
+  <span class="ex-tag">Practice 3.3</span>
+  <div class="runner" id="ex-getone" data-express>
+<textarea data-file="server.js">
+const express = require('express');
+const app = express();
+app.use(express.json());
+
+const users = [
+  { id: 1, username: 'john_doe', password: 'password123', role: 'user' },
+  { id: 2, username: 'jane_smith', password: 'securepass', role: 'user' },
+  { id: 3, username: 'admin_user', password: 'adminpass', role: 'admin' }
+];
+
+// TODO: GET /users/:id
+// - turn req.params.id into a number
+// - loop through users; if you find it → 200 and { status: 'success', data: theUser }
+// - if not found → 404 and { status: 'fail', message: 'User not found' }
+
+
+app.listen(3000, '127.0.0.1', () => {
+  console.log('Server is running on port 3000');
+});
+</textarea>
+<script type="text/plain" class="tests">
+_test('GET /users/2 → 200 with jane_smith in data', async () => { const r = await _req('GET', '/users/2'); _eq(r.status, 200, 'status'); return _eq(r.body.data && r.body.data.username, 'jane_smith', 'data.username'); });
+_test('GET /users/3 → admin_user (the last one)', async () => _eq(((await _req('GET', '/users/3')).body.data || {}).username, 'admin_user', 'data.username'));
+_test('GET /users/99 → 404', async () => _eq((await _req('GET', '/users/99')).status, 404, 'status'));
+_test('the 404 body has message "User not found"', async () => _eq((await _req('GET', '/users/99')).body.message, 'User not found', 'message'));
+</script>
+<script type="text/plain" class="tries">
+GET /users/2
+GET /users/99
+GET /users/abc
+</script>
+<script type="text/plain" class="solution">
+const express = require('express');
+const app = express();
+app.use(express.json());
+
+const users = [
+  { id: 1, username: 'john_doe', password: 'password123', role: 'user' },
+  { id: 2, username: 'jane_smith', password: 'securepass', role: 'user' },
+  { id: 3, username: 'admin_user', password: 'adminpass', role: 'admin' }
+];
+
+app.get('/users/:id', (req, res) => {
+  const id = Number(req.params.id);
+
+  for (let i = 0; i < users.length; i++) {
+    if (users[i].id === id) {
+      return res.status(200).json({
+        status: 'success',
+        data: users[i]
+      });
+    }
+  }
+
+  return res.status(404).json({
+    status: 'fail',
+    message: 'User not found'
+  });
+});
+
+app.listen(3000, '127.0.0.1', () => {
+  console.log('Server is running on port 3000');
+});
+</script>
+  </div>
+  <details class="hint"><summary>Hint 1</summary><div>This is <code>findUserById</code> from Chapter 1, but instead of <code>return users[i]</code> you <code>return res.status(200).json(...)</code>.</div></details>
+  <details class="hint"><summary>Hint 2</summary><div>The 404 goes <strong>after</strong> the loop, not inside it.</div></details>
+</div>
+
+<h2 id="post">Create a user: POST /users</h2>
+<p>For POST, the new data comes in the <strong>body</strong>: <code>req.body</code>. Steps:</p>
+<ol>
+  <li>Take the fields out with destructuring: <code>const { username, password, role } = req.body;</code></li>
+  <li><strong>Validate</strong>: if anything is missing → <code>400</code> and stop (<code>return</code>).</li>
+  <li>Make the new object (with a new id) and <code>push</code> it.</li>
+  <li>Answer <code>201</code> with the new user.</li>
+</ol>
+
+<div class="exercise">
+  <span class="ex-tag">Practice 3.4</span>
+  <div class="runner" id="ex-post" data-express>
+<textarea data-file="server.js">
+const express = require('express');
+const app = express();
+app.use(express.json());
+
+const users = [
+  { id: 1, username: 'john_doe', password: 'password123', role: 'user' },
+  { id: 2, username: 'jane_smith', password: 'securepass', role: 'user' },
+  { id: 3, username: 'admin_user', password: 'adminpass', role: 'admin' }
+];
+
+app.get('/users', (req, res) => {
+  res.status(200).json({ status: 'success', results: users.length, data: users });
+});
+
+// TODO: POST /users
+// 1. get username, password, role from req.body
+// 2. if any is missing → 400 and { status: 'fail', message: 'Please provide all required fields.' }
+// 3. make newUser = { id: users.length + 1, username, password, role } and push it
+// 4. → 201 and { status: 'success', message: 'User created successfully', data: newUser }
+
+
+app.listen(3000, '127.0.0.1', () => {
+  console.log('Server is running on port 3000');
+});
+</textarea>
+<script type="text/plain" class="tests">
+_test('POST without a role → 400', async () => _eq((await _req('POST', '/users', { username: 'x', password: 'y' })).status, 400, 'status'));
+_test('POST with all fields → 201', async () => _eq((await _req('POST', '/users', { username: 'lina', password: 'pw', role: 'user' })).status, 201, 'status'));
+_test('the 201 body has the new user with id 5 in data', async () => { const r = await _req('POST', '/users', { username: 'omar', password: 'pw', role: 'user' }); return _eq(r.body.data, { id: 5, username: 'omar', password: 'pw', role: 'user' }, 'data'); });
+_test('GET /users now has 5 users', async () => _eq((await _req('GET', '/users')).body.results, 5, 'results'));
+</script>
+<script type="text/plain" class="tries">
+POST /users {"username": "lina", "password": "secret", "role": "user"}
+POST /users {"username": "lina"}
+GET /users
+</script>
+<script type="text/plain" class="solution">
+const express = require('express');
+const app = express();
+app.use(express.json());
+
+const users = [
+  { id: 1, username: 'john_doe', password: 'password123', role: 'user' },
+  { id: 2, username: 'jane_smith', password: 'securepass', role: 'user' },
+  { id: 3, username: 'admin_user', password: 'adminpass', role: 'admin' }
+];
+
+app.get('/users', (req, res) => {
+  res.status(200).json({ status: 'success', results: users.length, data: users });
+});
+
+app.post('/users', (req, res) => {
+  const { username, password, role } = req.body;
+
+  if (!username || !password || !role) {
+    return res.status(400).json({
+      status: 'fail',
+      message: 'Please provide all required fields.'
+    });
+  }
+
+  const newUser = {
+    id: users.length + 1,
+    username,
+    password,
+    role
+  };
+
+  users.push(newUser);
+
+  res.status(201).json({
+    status: 'success',
+    message: 'User created successfully',
+    data: newUser
+  });
+});
+
+app.listen(3000, '127.0.0.1', () => {
+  console.log('Server is running on port 3000');
+});
+</script>
+  </div>
+  <div class="callout analogy"><span class="label">Experiment (after it works)</span>
+  <p>Put <code>//</code> in front of <code>app.use(express.json());</code>, press Run, and send a POST again. Read the error: <em>“Cannot destructure property 'username' of 'req.body' as it is undefined”</em>. Now you'll recognise it when it happens for real. Remove the <code>//</code> again.</p></div>
+  <details class="hint"><summary>Hint</summary><div><code>{ id: users.length + 1, username, password, role }</code> — writing just <code>username</code> is short for <code>username: username</code>.</div></details>
+</div>
+
+<h2 id="put">Update a user: PUT /users/:id</h2>
+<p>PUT combines what you know: find by id (like GET one) + read the body (like POST).</p>
+<div class="exercise">
+  <span class="ex-tag">Practice 3.5</span>
+  <div class="runner" id="ex-put" data-express>
+<textarea data-file="server.js">
+const express = require('express');
+const app = express();
+app.use(express.json());
+
+const users = [
+  { id: 1, username: 'john_doe', password: 'password123', role: 'user' },
+  { id: 2, username: 'jane_smith', password: 'securepass', role: 'user' },
+  { id: 3, username: 'admin_user', password: 'adminpass', role: 'admin' }
+];
+
+// TODO: PUT /users/:id
+// - id = Number(req.params.id); username, password, role from req.body
+// - loop: when you find the user:
+//     - if a field is missing → 400 { status: 'fail', message: 'Please provide all required fields.' }
+//     - else change the user's 3 fields → 200 { status: 'success', message: 'User updated successfully', data: theUser }
+// - after the loop → 404 { status: 'fail', message: 'User not found' }
+
+
+app.listen(3000, '127.0.0.1', () => {
+  console.log('Server is running on port 3000');
+});
+</textarea>
+<script type="text/plain" class="tests">
+_test('PUT /users/2 with all fields → 200', async () => _eq((await _req('PUT', '/users/2', { username: 'jane', password: 'new', role: 'admin' })).status, 200, 'status'));
+_test('the user was really changed', async () => { const r = await _req('PUT', '/users/1', { username: 'johnny', password: 'p', role: 'user' }); return _eq(r.body.data, { id: 1, username: 'johnny', password: 'p', role: 'user' }, 'data'); });
+_test('PUT /users/2 with a missing field → 400', async () => _eq((await _req('PUT', '/users/2', { username: 'x' })).status, 400, 'status'));
+_test('PUT /users/99 → 404', async () => _eq((await _req('PUT', '/users/99', { username: 'a', password: 'b', role: 'user' })).status, 404, 'status'));
+</script>
+<script type="text/plain" class="tries">
+PUT /users/2 {"username": "jane", "password": "new", "role": "admin"}
+PUT /users/2 {"username": "jane"}
+PUT /users/42 {"username": "a", "password": "b", "role": "user"}
+</script>
+<script type="text/plain" class="solution">
+const express = require('express');
+const app = express();
+app.use(express.json());
+
+const users = [
+  { id: 1, username: 'john_doe', password: 'password123', role: 'user' },
+  { id: 2, username: 'jane_smith', password: 'securepass', role: 'user' },
+  { id: 3, username: 'admin_user', password: 'adminpass', role: 'admin' }
+];
+
+app.put('/users/:id', (req, res) => {
+  const id = Number(req.params.id);
+  const { username, password, role } = req.body;
+
+  for (let i = 0; i < users.length; i++) {
+    if (users[i].id === id) {
+      if (!username || !password || !role) {
+        return res.status(400).json({
+          status: 'fail',
+          message: 'Please provide all required fields.'
+        });
+      }
+
+      users[i].username = username;
+      users[i].password = password;
+      users[i].role = role;
+
+      return res.status(200).json({
+        status: 'success',
+        message: 'User updated successfully',
+        data: users[i]
+      });
+    }
+  }
+
+  return res.status(404).json({
+    status: 'fail',
+    message: 'User not found'
+  });
+});
+
+app.listen(3000, '127.0.0.1', () => {
+  console.log('Server is running on port 3000');
+});
+</script>
+  </div>
+</div>
+
+<h2 id="delete">Delete a user: DELETE /users/:id — find the bug!</h2>
+<div class="exercise">
+  <span class="ex-tag bug">Spot the bug 3.6</span>
+  <p>This DELETE route <em>looks</em> right, but deleting user 2 or 3 always says “User not found”. Run it, send the requests, and find out why. Then fix it.</p>
+  <div class="runner" id="ex-deletebug" data-express>
+<textarea data-file="server.js">
+const express = require('express');
+const app = express();
+app.use(express.json());
+
+const users = [
+  { id: 1, username: 'john_doe', password: 'password123', role: 'user' },
+  { id: 2, username: 'jane_smith', password: 'securepass', role: 'user' },
+  { id: 3, username: 'admin_user', password: 'adminpass', role: 'admin' }
+];
+
+app.get('/users', (req, res) => {
+  res.status(200).json({ status: 'success', results: users.length, data: users });
+});
+
+app.delete('/users/:id', (req, res) => {
+  const id = Number(req.params.id);
+
+  for (let i = 0; i < users.length; i++) {
+    if (users[i].id === id) {
+      users.splice(i, 1);
+
+      return res.status(200).json({
+        status: 'success',
+        message: 'User deleted successfully'
+      });
+    }
+
+    return res.status(404).json({
+      status: 'fail',
+      message: 'User not found'
+    });
+  }
+});
+
+app.listen(3000, '127.0.0.1', () => {
+  console.log('Server is running on port 3000');
+});
+</textarea>
+<script type="text/plain" class="tests">
+_test('DELETE /users/3 → 200', async () => _eq((await _req('DELETE', '/users/3')).status, 200, 'status'));
+_test('user 3 is really gone', async () => _eq(((await _req('GET', '/users')).body.data || []).map(u => u.id), [1, 2], 'ids left'));
+_test('DELETE /users/99 → 404', async () => _eq((await _req('DELETE', '/users/99')).status, 404, 'status'));
+</script>
+<script type="text/plain" class="tries">
+DELETE /users/1
+DELETE /users/3
+GET /users
+</script>
+<script type="text/plain" class="solution">
+const express = require('express');
+const app = express();
+app.use(express.json());
+
+const users = [
+  { id: 1, username: 'john_doe', password: 'password123', role: 'user' },
+  { id: 2, username: 'jane_smith', password: 'securepass', role: 'user' },
+  { id: 3, username: 'admin_user', password: 'adminpass', role: 'admin' }
+];
+
+app.get('/users', (req, res) => {
+  res.status(200).json({ status: 'success', results: users.length, data: users });
+});
+
+app.delete('/users/:id', (req, res) => {
+  const id = Number(req.params.id);
+
+  for (let i = 0; i < users.length; i++) {
+    if (users[i].id === id) {
+      users.splice(i, 1);
+
+      return res.status(200).json({
+        status: 'success',
+        message: 'User deleted successfully'
+      });
+    }
+  } // ← the loop ends HERE now
+
+  // only after checking EVERY user:
+  return res.status(404).json({
+    status: 'fail',
+    message: 'User not found'
+  });
+});
+
+app.listen(3000, '127.0.0.1', () => {
+  console.log('Server is running on port 3000');
+});
+</script>
+  </div>
+  <details class="hint"><summary>Hint 1</summary><div>Follow the loop by hand for id 3. First round: i = 0, the user's id is 1. Is it equal to 3? No… so what's the next line that runs?</div></details>
+  <details class="hint"><summary>Hint 2</summary><div>The 404 <code>return</code> is <em>inside</em> the loop, so the loop stops after the first user. Same mistake as Chapter 1's Hint 2!</div></details>
+</div>
+
+<h2 id="postman">Test your real server with Postman</h2>
+<ol class="steps">
+  <li>Start your server: <code>node server.js</code>.</li>
+  <li>Open Postman → <strong>New</strong> → <strong>HTTP</strong> (or click the <strong>+</strong> tab).</li>
+  <li>Choose the method (GET, POST…) from the dropdown on the left of the URL bar, and type the URL: <code>http://127.0.0.1:3000/users</code>.</li>
+  <li>For POST/PUT: click the <strong>Body</strong> tab → choose <strong>raw</strong> → in the dropdown on the right change <strong>Text</strong> to <strong>JSON</strong>. Then type your JSON, for example:
+<pre><code class="language-json">{ "username": "lina", "password": "secret", "role": "user" }</code></pre></li>
+  <li>Click <strong>Send</strong>. Underneath you see the <strong>status</strong> (like <code>201 Created</code>) and the <strong>response body</strong>.</li>
+  <li>Save it into your collection with <kbd>Ctrl</kbd>+<kbd>S</kbd> so you can send it again later.</li>
+</ol>
+<div class="callout warn"><span class="label">Common Postman mistakes</span>
+<ul>
+  <li><strong>Body is undefined / 400 “missing fields”</strong> even though you typed a body → you left it on <strong>Text</strong> instead of <strong>JSON</strong>, so Express didn't read it.</li>
+  <li><strong>“Error: connect ECONNREFUSED”</strong> → your server isn't running, or the port in the URL is wrong.</li>
+  <li><strong>Cookies</strong>: Postman keeps them for you. Click <strong>Cookies</strong> (under the Send button) to see or delete them.</li>
+</ul></div>
+
+<div class="exercise">
+  <span class="ex-tag pc">On your computer</span>
+  <p>Build <code>server.js</code> in your <code>first-server</code> folder with all five routes. Type it — don't copy-paste — your fingers learn too.</p>
+  <ul class="checklist" data-id="ch3">
+    <li><code>GET /users</code> returns all users</li>
+    <li><code>GET /users/2</code> returns one user, <code>GET /users/99</code> returns 404</li>
+    <li><code>POST /users</code> creates a user (201) and refuses missing fields (400)</li>
+    <li><code>PUT /users/2</code> changes a user</li>
+    <li><code>DELETE /users/3</code> deletes a user, and <code>GET /users</code> shows it's gone</li>
+    <li>I tested each one in Postman</li>
+    <li>I restarted the server and noticed my changes were gone (the array resets!)</li>
+  </ul>
+</div>
+
+<div class="quiz">
+  <p class="q">You restarted the server and all the users you created are gone. Why?</p>
+  <div class="options">
+    <button data-why="The code is fine.">There's a bug in POST</button>
+    <button data-correct>The data lives in an array in memory, which is created fresh every start</button>
+    <button data-why="Postman doesn't store your server's data.">Postman deleted them</button>
+  </div>
+  <div class="explain">Memory is wiped when a program stops. To keep data for real, you need a database — that's Chapter 5.</div>
+</div>
+</main>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/javascript/javascript.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/sql/sql.min.js"></script>
+<script src="assets/app.js"></script>
+</body>
+</html>

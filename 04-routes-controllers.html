@@ -1,0 +1,468 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Routes and Controllers · Backend from Zero</title>
+<meta name="description" content="Split your server into files: require, module.exports, express.Router, routes and controllers.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=JetBrains+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.css">
+<link rel="stylesheet" href="assets/style.css">
+<script>try{var t=localStorage.getItem('bfz-theme');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body data-page="04-routes-controllers.html">
+<main>
+<div class="kicker">Chapter 4 · course week 5</div>
+<h1>Routes &amp; controllers: splitting your code into files</h1>
+<p class="lead">One big <code>server.js</code> gets messy fast. Real projects split the code into small files, each with one job. This is the structure your final project will use.</p>
+
+<h2 id="structure">The folder structure</h2>
+<div class="tree">my-backend/
+├── server.js              <span class="c">← starts the server (app.listen)</span>
+├── index.js               <span class="c">← creates the app and connects the routers</span>
+├── routes/
+│   └── userRoutes.js      <span class="c">← "which URL runs which function"</span>
+├── controllers/
+│   └── userController.js  <span class="c">← the functions that do the work</span>
+└── models/
+    └── User.js            <span class="c">← the data (later replaced by db.js + MySQL)</span></div>
+<div class="callout analogy"><span class="label">Back to the restaurant</span>
+<p>The <strong>routes</strong> file is the waiter's list: “table orders pizza → send to the pizza cook”. The <strong>controller</strong> is the cook who actually makes it. The waiter never cooks, and the cook never takes orders. Each file has one job, so you always know where to look.</p></div>
+
+<div class="diagram" role="img" aria-label="How the files connect: server.js requires index.js, which requires userRoutes.js, which requires userController.js, which requires the model.">
+<svg viewBox="0 0 720 150" width="720" height="150">
+  <defs><marker id="ah4" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" class="muted"/></marker></defs>
+  <rect class="box" x="5" y="45" width="120" height="60" rx="10"/><text x="65" y="72" text-anchor="middle" font-weight="700" class="mono small">server.js</text><text x="65" y="90" text-anchor="middle" class="muted small">listen</text>
+  <rect class="box-a" x="150" y="45" width="120" height="60" rx="10"/><text x="210" y="72" text-anchor="middle" font-weight="700" class="mono small">index.js</text><text x="210" y="90" text-anchor="middle" class="muted small">app.use(...)</text>
+  <rect class="box-w" x="295" y="45" width="140" height="60" rx="10"/><text x="365" y="72" text-anchor="middle" font-weight="700" class="mono small">userRoutes.js</text><text x="365" y="90" text-anchor="middle" class="muted small">router.get(...)</text>
+  <rect class="box-g" x="460" y="45" width="150" height="60" rx="10"/><text x="535" y="72" text-anchor="middle" font-weight="700" class="mono small">userController.js</text><text x="535" y="90" text-anchor="middle" class="muted small">(req, res) =&gt; {…}</text>
+  <rect class="box-p" x="635" y="45" width="80" height="60" rx="10"/><text x="675" y="72" text-anchor="middle" font-weight="700" class="mono small">User.js</text><text x="675" y="90" text-anchor="middle" class="muted small">data</text>
+  <line class="arrow" x1="125" y1="75" x2="146" y2="75" marker-end="url(#ah4)"/>
+  <line class="arrow" x1="270" y1="75" x2="291" y2="75" marker-end="url(#ah4)"/>
+  <line class="arrow" x1="435" y1="75" x2="456" y2="75" marker-end="url(#ah4)"/>
+  <line class="arrow" x1="610" y1="75" x2="631" y2="75" marker-end="url(#ah4)"/>
+  <text x="360" y="30" text-anchor="middle" class="muted small">each arrow = "this file require()s the next one"</text>
+  <text x="360" y="135" text-anchor="middle" class="muted small">a request travels the same way: app → router → controller → data</text>
+</svg>
+</div>
+
+<h2 id="modules">module.exports and require: sharing between files</h2>
+<p>Every file is closed by default: its variables are private. To share something, the file must <strong>export</strong> it, and the other file must <strong>require</strong> it.</p>
+<div class="file-label">math.js</div>
+<pre><code class="language-javascript">const add = (a, b) =&gt; a + b;
+const secret = 42;            // not exported → other files can't see it
+
+module.exports = { add };     // "this file gives away: add"</code></pre>
+<div class="file-label">main.js</div>
+<pre><code class="language-javascript">const { add } = require('./math');   // "give me add from math.js"
+console.log(add(2, 3));              // 5</code></pre>
+<p>The path rules:</p>
+<table>
+  <thead><tr><th>You write</th><th>Meaning</th></tr></thead>
+  <tbody>
+    <tr><td><code>require('express')</code></td><td>No dot → a <strong>package</strong> from <code>node_modules</code></td></tr>
+    <tr><td><code>require('./math')</code></td><td><code>./</code> → a file in the <strong>same folder</strong> (the <code>.js</code> is optional)</td></tr>
+    <tr><td><code>require('../models/User')</code></td><td><code>../</code> → go <strong>up one folder</strong>, then into <code>models</code></td></tr>
+  </tbody>
+</table>
+<p>Two ways to export, both common in your course:</p>
+<pre><code class="language-javascript">module.exports = { retrieveAllUsers, createUser };  // an object with several things
+// → other file: const { retrieveAllUsers, createUser } = require('../controllers/userController');
+
+module.exports = userRouter;                         // just ONE thing
+// → other file: const userRouter = require('./routes/userRoutes');   (no { } !)</code></pre>
+
+<div class="exercise">
+  <span class="ex-tag">Practice 4.1</span>
+  <p>This exercise has <strong>two files</strong> — click the tabs to switch. The orange dot means “you need to write something here”.</p>
+  <div class="runner" id="ex-modules" data-entry="main.js">
+<textarea data-file="main.js" data-todo>
+// TODO: require add and multiply from math.js (use destructuring)
+
+
+console.log(add(2, 3));       // 5
+console.log(multiply(4, 5));  // 20
+</textarea>
+<textarea data-file="math.js" data-todo>
+function add(a, b) {
+  return a + b;
+}
+
+function multiply(a, b) {
+  return a * b;
+}
+
+// TODO: export both functions so other files can use them
+
+</textarea>
+<script type="text/plain" class="tests">
+_test('math.js exports add and multiply', () => { const m = _sim.require('./math', 'main.js'); return _eq([typeof m.add, typeof m.multiply], ['function', 'function'], 'exports of math.js'); });
+_test('main.js printed 5 and 20', () => _eq(_logs.map(l => l.text), ['5', '20'], 'printed lines'));
+</script>
+<script type="text/plain" class="solution" data-file="main.js">
+const { add, multiply } = require('./math');
+
+console.log(add(2, 3));
+console.log(multiply(4, 5));
+</script>
+<script type="text/plain" class="solution" data-file="math.js">
+function add(a, b) {
+  return a + b;
+}
+
+function multiply(a, b) {
+  return a * b;
+}
+
+module.exports = { add, multiply };
+</script>
+  </div>
+</div>
+
+<h2 id="router">express.Router(): a mini app for one topic</h2>
+<p>A <strong>router</strong> holds all routes for one topic (users, trips…). Inside the router, paths are <em>relative</em>. In <code>index.js</code> you plug the router in at a starting path:</p>
+<div class="file-label">routes/userRoutes.js</div>
+<pre><code class="language-javascript">const express = require('express');
+const { retrieveAllUsers, retrieveUserById } = require('../controllers/userController');
+
+const userRouter = express.Router();
+
+userRouter.get('/', retrieveAllUsers);      // → GET /users
+userRouter.get('/:id', retrieveUserById);   // → GET /users/:id
+
+module.exports = userRouter;</code></pre>
+<div class="file-label">index.js</div>
+<pre><code class="language-javascript">const express = require('express');
+const userRouter = require('./routes/userRoutes');
+
+const app = express();
+app.use(express.json());
+
+app.use('/users', userRouter);   // every route in userRouter now starts with /users
+
+module.exports = { app };</code></pre>
+<p>Final URL = the <strong>prefix in <code>app.use</code></strong> + <strong>the path in the router</strong>: <code>'/users'</code> + <code>'/:id'</code> = <code>/users/:id</code>.</p>
+<p>Notice: in the routes file we pass the function's <strong>name</strong> — <code>retrieveAllUsers</code>, no <code>()</code>. We're handing the function to Express to call later, not calling it now (remember Practice 1.7).</p>
+
+<div class="exercise">
+  <span class="ex-tag">Practice 4.2</span>
+  <div class="quiz">
+    <p class="q">index.js has <code>app.use('/trips', tripRouter)</code> and the router has <code>tripRouter.get('/:id/reviews', getReviews)</code>. Which URL runs <code>getReviews</code>?</p>
+    <div class="options">
+      <button data-why="The router's path is added after the prefix — the prefix isn't replaced.">/:id/reviews</button>
+      <button data-correct>/trips/5/reviews</button>
+      <button data-why="The prefix comes first.">/reviews/trips/5</button>
+    </div>
+    <div class="explain">Prefix + router path: <code>/trips</code> + <code>/:id/reviews</code>.</div>
+  </div>
+</div>
+
+<h2 id="controllers">Controllers</h2>
+<p>A controller is just a function <code>(req, res) =&gt; { ... }</code> with a clear name, saved in a variable and exported. Exactly the same code you wrote in Chapter 3, only moved:</p>
+<div class="file-label">controllers/userController.js</div>
+<pre><code class="language-javascript">const { users } = require('../models/User');
+
+const retrieveAllUsers = (req, res) =&gt; {
+  res.status(200).json({ status: 'success', results: users.length, data: users });
+};
+
+module.exports = { retrieveAllUsers };</code></pre>
+
+<h3>Why separate index.js and server.js?</h3>
+<p><code>index.js</code> <em>builds</em> the app; <code>server.js</code> <em>starts</em> it. Keeping them apart means other code (like automatic tests) can load the app without starting a real server. It also keeps server.js tiny: later it will also create the database tables before starting.</p>
+<div class="file-label">server.js</div>
+<pre><code class="language-javascript">const { app } = require('./index.js');
+
+app.listen(3000, '127.0.0.1', () =&gt; {
+  console.log('Server is running on port 3000');
+});</code></pre>
+
+<div class="exercise">
+  <span class="ex-tag">Practice 4.3</span>
+  <h4>Connect all the files</h4>
+  <p>Five files. <code>server.js</code> and <code>models/User.js</code> are done (🔒). Fill in the three files with an orange dot. Then press Run and test with the request box.</p>
+  <div class="runner" id="ex-split" data-express data-entry="server.js">
+<textarea data-file="index.js" data-todo>
+const express = require('express');
+// TODO 1: require userRouter from ./routes/userRoutes
+
+
+const app = express();
+app.use(express.json());
+
+// TODO 2: connect userRouter at the path '/users'
+
+
+module.exports = { app };
+</textarea>
+<textarea data-file="routes/userRoutes.js" data-todo>
+const express = require('express');
+// TODO 1: require retrieveAllUsers and retrieveUserById
+//         from ../controllers/userController
+
+
+const userRouter = express.Router();
+
+// TODO 2: GET '/'    → retrieveAllUsers
+// TODO 3: GET '/:id' → retrieveUserById
+
+
+module.exports = userRouter;
+</textarea>
+<textarea data-file="controllers/userController.js" data-todo>
+const { users } = require('../models/User');
+
+const retrieveAllUsers = (req, res) => {
+  res.status(200).json({ status: 'success', results: users.length, data: users });
+};
+
+// TODO 1: write retrieveUserById
+//   found     → 200 { status: 'success', data: user }
+//   not found → 404 { status: 'fail', message: 'User not found' }
+//   (tip: users.find(u => u.id === id) is shorter than a loop)
+
+
+// TODO 2: export both functions
+
+</textarea>
+<textarea data-file="server.js" data-readonly>
+const { app } = require('./index.js');
+
+app.listen(3000, '127.0.0.1', () => {
+  console.log('Server is running on port 3000');
+});
+</textarea>
+<textarea data-file="models/User.js" data-readonly>
+const users = [
+  { id: 1, username: 'john_doe', password: 'password123', role: 'user' },
+  { id: 2, username: 'jane_smith', password: 'securepass', role: 'user' },
+  { id: 3, username: 'admin_user', password: 'adminpass', role: 'admin' }
+];
+
+module.exports = { users };
+</textarea>
+<script type="text/plain" class="tests">
+_test('GET /users → 200 with 3 users', async () => { const r = await _req('GET', '/users'); _eq(r.status, 200, 'status'); return _eq(r.body.results, 3, 'results'); });
+_test('GET /users/2 → jane_smith', async () => { const r = await _req('GET', '/users/2'); _eq(r.status, 200, 'status'); return _eq(r.body.data && r.body.data.username, 'jane_smith', 'data.username'); });
+_test('GET /users/99 → 404', async () => _eq((await _req('GET', '/users/99')).status, 404, 'status'));
+</script>
+<script type="text/plain" class="tries">
+GET /users
+GET /users/2
+GET /users/99
+</script>
+<script type="text/plain" class="solution" data-file="index.js">
+const express = require('express');
+const userRouter = require('./routes/userRoutes');
+
+const app = express();
+app.use(express.json());
+
+app.use('/users', userRouter);
+
+module.exports = { app };
+</script>
+<script type="text/plain" class="solution" data-file="routes/userRoutes.js">
+const express = require('express');
+const {
+  retrieveAllUsers,
+  retrieveUserById
+} = require('../controllers/userController');
+
+const userRouter = express.Router();
+
+userRouter.get('/', retrieveAllUsers);
+userRouter.get('/:id', retrieveUserById);
+
+module.exports = userRouter;
+</script>
+<script type="text/plain" class="solution" data-file="controllers/userController.js">
+const { users } = require('../models/User');
+
+const retrieveAllUsers = (req, res) => {
+  res.status(200).json({ status: 'success', results: users.length, data: users });
+};
+
+const retrieveUserById = (req, res) => {
+  const id = Number(req.params.id);
+  const user = users.find(u => u.id === id);
+
+  if (!user) {
+    return res.status(404).json({ status: 'fail', message: 'User not found' });
+  }
+
+  return res.status(200).json({ status: 'success', data: user });
+};
+
+module.exports = {
+  retrieveAllUsers,
+  retrieveUserById
+};
+</script>
+  </div>
+  <details class="hint"><summary>Hint 1 — where to start?</summary><div>Start at the bottom of the chain: finish the controller and export it. Then the routes file. Then index.js. Run after each step and read the error — it tells you what's still missing.</div></details>
+  <details class="hint"><summary>Hint 2 — the routes file</summary><div><code>const { retrieveAllUsers, retrieveUserById } = require('../controllers/userController');</code> then <code>userRouter.get('/', retrieveAllUsers);</code></div></details>
+</div>
+
+<h2 id="undefined-error">The error you WILL see: “requires a callback function but got a [object Undefined]”</h2>
+<div class="exercise">
+  <span class="ex-tag bug">Spot the bug 4.4</span>
+  <p>Press Run. The server crashes immediately. Read the error, find the cause, fix it.</p>
+  <div class="runner" id="ex-undef" data-express data-entry="index.js">
+<textarea data-file="index.js" data-readonly>
+const express = require('express');
+const userRouter = require('./routes/userRoutes');
+
+const app = express();
+app.use(express.json());
+app.use('/users', userRouter);
+
+app.listen(3000, () => console.log('Server is running on port 3000'));
+</textarea>
+<textarea data-file="routes/userRoutes.js">
+const express = require('express');
+const { retrieveAllUsers } = require('../controllers/userController');
+
+const userRouter = express.Router();
+
+userRouter.get('/', retrieveAllUsers);
+
+module.exports = userRouter;
+</textarea>
+<textarea data-file="controllers/userController.js">
+const users = [{ id: 1, username: 'sara' }];
+
+const getAllUsers = (req, res) => {
+  res.status(200).json({ status: 'success', results: users.length, data: users });
+};
+
+module.exports = { getAllUsers };
+</textarea>
+<script type="text/plain" class="tests">
+_test('GET /users → 200', async () => _eq((await _req('GET', '/users')).status, 200, 'status'));
+</script>
+<script type="text/plain" class="tries">
+GET /users
+</script>
+<script type="text/plain" class="solution" data-file="routes/userRoutes.js">
+const express = require('express');
+const { getAllUsers } = require('../controllers/userController');
+
+const userRouter = express.Router();
+
+userRouter.get('/', getAllUsers);
+
+module.exports = userRouter;
+</script>
+  </div>
+  <details class="hint"><summary>Hint</summary><div>The routes file asks for <code>retrieveAllUsers</code>. What name does the controller actually export? When you ask for a name that isn't exported, you get <code>undefined</code> — and Express says “got a [object Undefined]”. Make the names match (in either file).</div></details>
+</div>
+
+<h2 id="order">Route order matters!</h2>
+<p>Express checks routes <strong>from top to bottom</strong> and uses the <strong>first one that matches</strong>. <code>/:id</code> matches <em>anything</em> — including words like <code>admins</code> or <code>last-viewed</code>.</p>
+<pre><code class="language-javascript">router.get('/:id', retrieveUserById);  // GET /users/admins matches HERE (id = "admins")
+router.get('/admins', getAdmins);      // never reached!</code></pre>
+<p><strong>Rule:</strong> put fixed paths (<code>/admins</code>, <code>/managers</code>, <code>/last-viewed</code>) <strong>above</strong> <code>/:id</code>.</p>
+<div class="callout warn"><span class="label">This bug is in the course code</span>
+<p>In the week 8 code, <code>/managers</code>, <code>/last-viewed</code>, <code>/reviews</code> and <code>/ratings</code> are all written <em>after</em> <code>/:id</code>, so they never run. Now you know why — and you won't make that mistake in your project.</p></div>
+
+<div class="exercise">
+  <span class="ex-tag bug">Spot the bug 4.5</span>
+  <p><code>GET /users/admins</code> should list the admins, but it answers “Invalid user ID”. Fix <code>routes/userRoutes.js</code>.</p>
+  <div class="runner" id="ex-order" data-express data-entry="index.js">
+<textarea data-file="routes/userRoutes.js" data-todo>
+const express = require('express');
+const { retrieveAllUsers, retrieveUserById, getAdmins } = require('../controllers/userController');
+
+const userRouter = express.Router();
+
+userRouter.get('/', retrieveAllUsers);
+userRouter.get('/:id', retrieveUserById);
+userRouter.get('/admins', getAdmins);
+
+module.exports = userRouter;
+</textarea>
+<textarea data-file="controllers/userController.js" data-readonly>
+const users = [
+  { id: 1, username: 'sara', role: 'admin' },
+  { id: 2, username: 'omar', role: 'user' },
+  { id: 3, username: 'lina', role: 'user' }
+];
+
+const retrieveAllUsers = (req, res) => {
+  res.status(200).json({ status: 'success', results: users.length, data: users });
+};
+
+const retrieveUserById = (req, res) => {
+  const id = Number(req.params.id);
+  if (!Number.isSafeInteger(id) || id <= 0) {
+    return res.status(400).json({ message: 'Invalid user ID' });
+  }
+  const user = users.find(u => u.id === id);
+  if (!user) return res.status(404).json({ message: 'User not found' });
+  res.status(200).json({ status: 'success', data: user });
+};
+
+const getAdmins = (req, res) => {
+  const admins = users.filter(u => u.role === 'admin');
+  res.status(200).json({ status: 'success', results: admins.length, data: admins });
+};
+
+module.exports = { retrieveAllUsers, retrieveUserById, getAdmins };
+</textarea>
+<textarea data-file="index.js" data-readonly>
+const express = require('express');
+const userRouter = require('./routes/userRoutes');
+
+const app = express();
+app.use(express.json());
+app.use('/users', userRouter);
+
+app.listen(3000, () => console.log('Server is running on port 3000'));
+</textarea>
+<script type="text/plain" class="tests">
+_test('GET /users/admins → 200 with 1 admin', async () => { const r = await _req('GET', '/users/admins'); _eq(r.status, 200, 'status'); return _eq(r.body.results, 1, 'results'); });
+_test('GET /users/2 still works', async () => _eq(((await _req('GET', '/users/2')).body.data || {}).username, 'omar', 'data.username'));
+</script>
+<script type="text/plain" class="tries">
+GET /users/admins
+GET /users/2
+</script>
+<script type="text/plain" class="solution" data-file="routes/userRoutes.js">
+const express = require('express');
+const { retrieveAllUsers, retrieveUserById, getAdmins } = require('../controllers/userController');
+
+const userRouter = express.Router();
+
+userRouter.get('/', retrieveAllUsers);
+userRouter.get('/admins', getAdmins);      // fixed paths FIRST
+userRouter.get('/:id', retrieveUserById);  // /:id LAST
+
+module.exports = userRouter;
+</script>
+  </div>
+</div>
+
+<div class="exercise">
+  <span class="ex-tag pc">On your computer</span>
+  <p>Take your Chapter 3 <code>server.js</code> and split it into this structure. Everything should work exactly as before — that's the point.</p>
+  <ul class="checklist" data-id="ch4">
+    <li>Made the folders <code>routes</code>, <code>controllers</code>, <code>models</code></li>
+    <li><code>models/User.js</code> exports the users array</li>
+    <li><code>controllers/userController.js</code> has 5 functions (get all, get one, create, update, delete) and exports them</li>
+    <li><code>routes/userRoutes.js</code> connects 5 routes to them and exports the router</li>
+    <li><code>index.js</code> creates the app, uses <code>express.json()</code>, plugs the router in at <code>/users</code>, exports <code>{ app }</code></li>
+    <li><code>server.js</code> only requires the app and calls <code>listen</code></li>
+    <li>All five requests still work in Postman</li>
+  </ul>
+</div>
+</main>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/javascript/javascript.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/sql/sql.min.js"></script>
+<script src="assets/app.js"></script>
+</body>
+</html>

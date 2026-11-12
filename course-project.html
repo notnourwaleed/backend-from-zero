@@ -1,0 +1,1804 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>The Lecture Project · Backend from Zero</title>
+<meta name="description" content="The complete lecture travel API, built file by file in final form, in the order you'd write it — no going back and forth.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=JetBrains+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.css">
+<link rel="stylesheet" href="assets/style.css">
+<script>try{var t=localStorage.getItem('bfz-theme');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body data-page="course-project.html">
+<main>
+<div class="kicker">The lecture project</div>
+<h1>The lecture project, file by file</h1>
+<p class="lead">This is the exact travel API from the lectures (the final week 8 version). Here every file is written <strong>once, in its finished form</strong>, in the order you would build it. No jumping back to change old files.</p>
+
+<div class="callout analogy"><span class="label">Why the lectures felt confusing</span>
+<p>In class the project <em>grew</em>: the same file was opened again and again over many weeks (<code>db.js</code> changed 4 times, <code>index.js</code> 4 times, <code>server.js</code> 5 times). That's how real projects grow — but when you're learning, it's hard to know which version is the “real” one. On this page there's only one version of each file: the final one.</p></div>
+
+<h2 id="how">How to use this page</h2>
+<ul>
+  <li>Go <strong>top to bottom</strong>. Each step is one file (or a group of very similar small files).</li>
+  <li>Long files are cut into <strong>parts</strong>. The parts, one after another, <em>are</em> the whole file — type them into the same file in that order.</li>
+  <li>After each file there's a <strong>✔ Check</strong>: a command that proves the file works before you move on.</li>
+  <li>Every part links to the chapter that explains the idea in depth. If something feels like magic, go read that chapter.</li>
+  <li>Boxes marked <strong>“Different from the lecture”</strong> show the few places where the lecture code had a bug. The fixed version is used here, and the box tells you what was wrong — so you can compare it with your notes.</li>
+</ul>
+<p>If you want to <em>see</em> it working first, jump to <a href="#playground">the playground at the end</a>: the whole finished project runs there, and you can send it requests.</p>
+
+<h2 id="weeks">Which week added what</h2>
+<p>Use this to connect the lectures to the final files:</p>
+<table>
+  <thead><tr><th>Week</th><th>What was added</th><th>Where it is in the final project</th></tr></thead>
+  <tbody>
+    <tr><td>4</td><td>One-file server with a users array: GET, POST, PUT, DELETE</td><td>Became <code>userController.js</code> + <code>userRoutes.js</code></td></tr>
+    <tr><td>5 (part 1)</td><td>Split into <code>routes/</code>, <code>controllers/</code>, <code>models/</code>; <code>index.js</code> + <code>server.js</code></td><td>The folder structure. <code>models/User.js</code> is no longer used at the end</td></tr>
+    <tr><td>5 (part 2)</td><td>A first try with a database built into Node (<code>node:sqlite</code>)</td><td><strong>Replaced</strong> by MySQL in week 6 — you can forget it</td></tr>
+    <tr><td>6 (part 1)</td><td>MySQL with <code>mysql2</code>, the USERS table, <code>async startServer()</code></td><td><code>db.js</code>, <code>server.js</code></td></tr>
+    <tr><td>6 (part 2)</td><td><code>.env</code> + <code>dotenv</code>; register and login</td><td><code>.env</code>, <code>authController.js</code>, <code>authRoutes.js</code></td></tr>
+    <tr><td>7</td><td>Validators, <code>?</code> placeholders, TRIPS and REVIEWS tables, MANAGER_ID, JOIN routes</td><td><code>utils/validators.js</code>, <code>db.js</code>, <code>tripController.js</code></td></tr>
+    <tr><td>8</td><td>bcrypt password hashing, get trip by id, cookies (last viewed trip), employees + managers</td><td><code>authController.js</code>, <code>userController.js</code>, <code>tripController.js</code>, <code>index.js</code></td></tr>
+  </tbody>
+</table>
+
+<h2 id="tree">The finished project</h2>
+<div class="tree">web-backend-base/
+├── .env                      <span class="c">← your secrets (never uploaded)</span>
+├── .env.example              <span class="c">← the same keys with fake values (uploaded)</span>
+├── .gitignore
+├── package.json
+├── db.js                     <span class="c">← step 2: connection + the 3 tables</span>
+├── utils/
+│   └── validators.js         <span class="c">← step 3: input checks</span>
+├── controllers/
+│   ├── authController.js     <span class="c">← step 4: register, login</span>
+│   ├── userController.js     <span class="c">← step 5: users CRUD + managers</span>
+│   └── tripController.js     <span class="c">← step 6: trips, reviews, cookies</span>
+├── routes/
+│   ├── authRoutes.js         <span class="c">← step 7</span>
+│   ├── userRoutes.js
+│   └── tripRoutes.js
+├── index.js                  <span class="c">← step 8: the app</span>
+└── server.js                 <span class="c">← step 9: create tables, start</span></div>
+<div class="callout note"><span class="label">Why this order?</span>
+<p>We build from the <strong>bottom up</strong>: first the files that don't need any other file of ours (db.js, validators), then the files that use them (controllers), then the files that use those (routes), and last the ones that tie everything together (index.js, server.js). That way, every file you write only uses things that already exist — you never write a <code>require</code> for a file that isn't there yet.</p></div>
+
+<!-- ============================================================ STEP 1 -->
+<h2 id="step1">Step 1 — Project setup</h2>
+<p>Chapter link: <a href="00-setup.html">0. Set up your computer</a>, <a href="05-async-mysql.html#connect">5. .env</a></p>
+<ol class="steps">
+  <li>Make a folder <code>web-backend-base</code> and open it in VS Code. Open the terminal.</li>
+  <li>Create the project and install the five packages:
+<pre><code class="language-bash">npm init -y
+npm install express mysql2 dotenv bcrypt cookie-parser</code></pre></li>
+  <li>Make the folders <code>utils</code>, <code>controllers</code> and <code>routes</code>.</li>
+  <li>In MySQL Workbench, create the database:
+<pre><code class="language-sql">CREATE DATABASE travel_db;</code></pre></li>
+  <li>Create these three files in the main folder:</li>
+</ol>
+<div class="file-label">.env</div>
+<pre><code class="language-ini">HOSTNAME=localhost
+PORT=5000
+
+DB_USER=root
+DB_PASSWORD=the_password_you_chose_when_installing_mysql
+DB_NAME=travel_db</code></pre>
+<div class="file-label">.env.example</div>
+<pre><code class="language-ini">HOSTNAME=localhost
+PORT=5000
+
+DB_USER=your_username
+DB_PASSWORD=your_password
+DB_NAME=your_db_name</code></pre>
+<div class="file-label">.gitignore</div>
+<pre><code class="nohl">node_modules
+.env</code></pre>
+<p><strong>✔ Check:</strong> <code>package.json</code> lists the five packages under <code>"dependencies"</code>, and Workbench shows <code>travel_db</code> in the Schemas panel.</p>
+
+<!-- ============================================================ STEP 2 -->
+<h2 id="step2">Step 2 — db.js: the connection and the tables</h2>
+<p>Chapter links: <a href="05-async-mysql.html#connect">5. Connecting to MySQL</a>, <a href="06-sql.html#create">6. CREATE TABLE</a>, <a href="08-joins-cookies.html#relations">8. Foreign keys</a></p>
+<p>This file has <strong>one job</strong>: give the rest of the project a connection to the database (<code>db</code>), and the SQL text to create the three tables. It doesn't create them itself — <code>server.js</code> will run them at start-up.</p>
+
+<h4>Part 1 of 3 — connect</h4>
+<div class="file-label">db.js</div>
+<pre><code class="language-javascript">const mysql = require("mysql2/promise");
+const dotenv = require("dotenv");
+dotenv.config();
+
+const db = mysql.createPool({
+    host: "localhost",
+    port: 3306,
+    user: process.env.DB_USER,
+    password: process.env.DB_PASSWORD,
+    database: process.env.DB_NAME
+}); // configs</code></pre>
+<ul>
+  <li><code>mysql2/promise</code> — the version of mysql2 that works with <code>await</code>.</li>
+  <li><code>dotenv.config()</code> loads <code>.env</code> into <code>process.env</code>. It must come <strong>before</strong> <code>createPool</code> (<a href="07-security.html#env">why</a>).</li>
+  <li><code>createPool</code> — a set of ready connections. The rest of the project only ever uses <code>db.query(...)</code>.</li>
+</ul>
+
+<h4>Part 2 of 3 — the three tables</h4>
+<pre><code class="language-javascript">// Create User Table
+const createUserTable = `CREATE TABLE IF NOT EXISTS USERS (
+        ID INT AUTO_INCREMENT PRIMARY KEY,
+        USERNAME VARCHAR(255) NOT NULL,
+        EMAIL VARCHAR(255) UNIQUE NOT NULL,
+        PASSWORD VARCHAR(255) NOT NULL,
+        ROLE ENUM('admin', 'user') NOT NULL DEFAULT 'user',
+        MANAGER_ID INT NULL,
+        FOREIGN KEY (MANAGER_ID) REFERENCES USERS(ID)
+    );
+`;
+
+const createTripTable = `CREATE TABLE IF NOT EXISTS TRIPS (
+        ID INT AUTO_INCREMENT PRIMARY KEY,
+        DESTINATION VARCHAR(150) NOT NULL,
+        COUNTRY VARCHAR(150) NOT NULL,
+        COST DECIMAL(10,2) NOT NULL
+)`;
+
+const createReviewTable = `CREATE TABLE IF NOT EXISTS REVIEWS (
+        ID INT AUTO_INCREMENT PRIMARY KEY,
+        USER_ID INT NOT NULL,
+        TRIP_ID INT NOT NULL,
+        RATING INT NOT NULL CHECK (RATING BETWEEN 1 AND 5),
+        FOREIGN KEY (USER_ID) REFERENCES USERS(ID),
+        FOREIGN KEY (TRIP_ID) REFERENCES TRIPS(ID),
+        UNIQUE (USER_ID, TRIP_ID)
+)`;</code></pre>
+<ul>
+  <li>These are just <strong>strings</strong> (text in backticks) holding SQL. Nothing runs yet.</li>
+  <li><strong>USERS</strong>: <code>EMAIL UNIQUE</code> = one account per email. <code>ROLE</code> can only be admin or user. <code>MANAGER_ID</code> points at another user (the boss) — it can be empty (<code>NULL</code>).</li>
+  <li><strong>TRIPS</strong>: simple table, <code>DECIMAL(10,2)</code> for money.</li>
+  <li><strong>REVIEWS</strong>: connects users and trips. Rating must be 1–5; one review per user per trip.</li>
+</ul>
+
+<h4>Part 3 of 3 — export</h4>
+<pre><code class="language-javascript">module.exports = {
+    db,
+    createUserTable,
+    createTripTable,
+    createReviewTable
+}</code></pre>
+
+<p><strong>✔ Check</strong> — this one-line command loads db.js and asks MySQL a tiny question. Run it in the terminal:</p>
+<pre><code class="language-bash">node -e "require('./db').db.query('SELECT 1').then(() => { console.log('DB OK'); process.exit(0); }).catch(e => { console.error(e.message); process.exit(1); })"</code></pre>
+<p>You should see <code>DB OK</code>. If not, the error tells you what's wrong (wrong password, MySQL not running, database missing) — see the list at the end of <a href="05-async-mysql.html#workbench">Chapter 5</a>.</p>
+
+<!-- ============================================================ STEP 3 -->
+<h2 id="step3">Step 3 — utils/validators.js: checking input</h2>
+<p>Chapter link: <a href="07-security.html#validation">7. Validate and sanitize</a></p>
+<p>Six small helper functions. Each returns an <strong>error message</strong> or <strong><code>null</code></strong> (= OK), except the first three which clean or answer true/false.</p>
+
+<h4>Part 1 of 2 — the basic helpers</h4>
+<div class="file-label">utils/validators.js</div>
+<pre><code class="language-javascript">const sanitizeInput = (value) =&gt; {
+    if (typeof value !== 'string') return '';
+    return value.trim().toLowerCase();
+};
+
+const isValidEmail = (email) =&gt; {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return typeof email === 'string' &amp;&amp; emailRegex.test(email);
+};
+
+const isStrongPassword = (password) =&gt; {
+    if (typeof password !== 'string') return false;
+
+    const passRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[\W_]).{8,}$/;
+    return passRegex.test(password);
+};</code></pre>
+<ul>
+  <li><code>sanitizeInput</code>: <code>"  Sara@Mail.com "</code> → <code>"sara@mail.com"</code>. Anything that isn't text becomes <code>''</code>.</li>
+  <li><code>isValidEmail</code>: “something@something.something”.</li>
+  <li><code>isStrongPassword</code>: lowercase + uppercase + digit + special character + at least 8 long. (<a href="07-security.html#validation">regex explained</a>)</li>
+</ul>
+
+<h4>Part 2 of 2 — the validators that return messages</h4>
+<pre><code class="language-javascript">const validateRequired = (fields, requiredKeys) =&gt; {
+    for (const key of requiredKeys) {
+        if (typeof fields[key] !== 'string' ||
+            !fields[key].trim()) {
+            return `${key} is required`;
+        }
+    }
+    return null;
+};
+
+const validateEmail = (email) =&gt; {
+    if (!email) return 'Email is required';
+    if (!isValidEmail(email)) return 'Invalid email format';
+    return null;
+};
+
+const validatePassword = (password) =&gt; {
+    if (!password) return 'Password is required';
+    if (!isStrongPassword(password)) {
+        return 'Password must have 8+ chars, upper, lower, number, and special char';
+    }
+    return null;
+};
+
+module.exports = {
+    sanitizeInput,
+    isValidEmail,
+    isStrongPassword,
+    validateRequired,
+    validateEmail,
+    validatePassword
+};</code></pre>
+<p><strong>✔ Check:</strong></p>
+<pre><code class="language-bash">node -e "const v = require('./utils/validators'); console.log(v.validateEmail('a@b'), v.validatePassword('Hello123!'))"</code></pre>
+<p>Expected: <code>Invalid email format null</code></p>
+
+<!-- ============================================================ STEP 4 -->
+<h2 id="step4">Step 4 — controllers/authController.js: register and login</h2>
+<p>Chapter links: <a href="07-security.html#register">7. Build register</a>, <a href="07-security.html#login">7. Build login</a>, <a href="07-security.html#bcrypt">7. bcrypt</a></p>
+
+<h4>Part 1 of 3 — imports</h4>
+<div class="file-label">controllers/authController.js</div>
+<pre><code class="language-javascript">const bcrypt = require('bcrypt');
+const { db } = require('../db');
+const dotenv = require('dotenv');
+dotenv.config();
+
+const {
+    sanitizeInput,
+    validateRequired,
+    validateEmail,
+    validatePassword
+} = require('../utils/validators');</code></pre>
+<p><code>'../db'</code> — two dots, because this file is inside <code>controllers/</code> and db.js is one folder up. (The dotenv lines aren't really needed here, since db.js already loads .env — but they're in the lecture code and do no harm.)</p>
+
+<h4>Part 2 of 3 — registerUser (6 steps)</h4>
+<pre><code class="language-javascript">const registerUser = async (req, res) =&gt; {
+    const { username, email, password } = req.body;
+
+    // 1. Clean input
+    const cleanUsername = sanitizeInput(username);
+    const cleanEmail = sanitizeInput(email);
+
+    // Do NOT trim or lowercase passwords
+    const cleanPassword = password;
+
+    // 2. Check required fields
+    const requiredError = validateRequired(
+        {
+            username: cleanUsername,
+            email: cleanEmail,
+            password: cleanPassword
+        },
+        ['username', 'email', 'password']
+    );
+
+    if (requiredError) {
+        return res.status(400).json({
+            message: requiredError
+        });
+    }
+
+    // 3. Validate email
+    const emailError = validateEmail(cleanEmail);
+
+    if (emailError) {
+        return res.status(400).json({
+            message: emailError
+        });
+    }
+
+    // 4. Validate password
+    const passwordError = validatePassword(cleanPassword);
+
+    if (passwordError) {
+        return res.status(400).json({
+            message: passwordError
+        });
+    }
+
+    // 5. Hash password using bcrypt
+    try {
+        const hashedPassword = await bcrypt.hash(cleanPassword, 12);
+
+        // 6. Parameterized query
+        const query = `
+            INSERT INTO USERS (USERNAME, EMAIL, PASSWORD, ROLE)
+            VALUES (?, ?, ?, ?)
+        `;
+
+        const [result] = await db.query(query, [
+            cleanUsername,
+            cleanEmail,
+            hashedPassword,
+            'user'
+        ]);
+
+        return res.status(201).json({
+            message: 'User registered successfully'
+        });
+
+    } catch (error) {
+        if (error.code === 'ER_DUP_ENTRY') {
+            return res.status(409).json({
+                message: 'Email already exists'
+            });
+        }
+
+        return res.status(500).json({
+            message: 'Registration error'
+        });
+    }
+};</code></pre>
+<ul>
+  <li>Steps 1–4 check the input. Each problem → <code>return res.status(400)</code> and the function stops.</li>
+  <li>Step 5 hashes the password (never store it as plain text).</li>
+  <li>Step 6 saves with <code>?</code> placeholders. New users are always <code>'user'</code>, never admin.</li>
+  <li>If the email exists, MySQL refuses because of <code>UNIQUE</code> and throws <code>ER_DUP_ENTRY</code> → we answer 409.</li>
+</ul>
+
+<h4>Part 3 of 3 — loginUser + export</h4>
+<pre><code class="language-javascript">const loginUser = async (req, res) =&gt; {
+    const { email, password } = req.body;
+
+    const cleanEmail = sanitizeInput(email);
+
+    if (!cleanEmail || !password) {
+        return res.status(400).json({
+            message: 'Please provide both email and password.'
+        });
+    }
+
+    // Parameterized query prevents SQL injection
+    const query = `
+        SELECT * FROM USERS WHERE EMAIL = ?
+    `;
+
+    try {
+        const [users] = await db.query(query, [
+            cleanEmail
+        ]);
+
+        if (users.length === 0) {
+            return res.status(401).json({
+                message: 'Invalid email or password.'
+            });
+        }
+
+        const user = users[0];
+
+        // Compare entered password with stored hash
+        const isMatch = await bcrypt.compare(
+            password,
+            user.PASSWORD
+        );
+
+        if (!isMatch) {
+            return res.status(401).json({
+                message: 'Invalid email or password.'
+            });
+        }
+
+        return res.status(200).json({
+            message: 'User logged in successfully',
+            user: {
+                id: user.ID,
+                username: user.USERNAME,
+                email: user.EMAIL,
+                role: user.ROLE
+            }
+        });
+
+    } catch (error) {
+        return res.status(500).json({
+            message: 'Login error'
+        });
+    }
+};
+
+module.exports = {
+    registerUser,
+    loginUser
+};</code></pre>
+<ul>
+  <li>Find the user by email → none: 401. Compare the password with the hash → no match: 401. Same message both times on purpose (<a href="07-security.html#login">why</a>).</li>
+  <li>The response builds a new object with only safe fields — the password hash is not sent.</li>
+</ul>
+<p><strong>✔ Check:</strong></p>
+<pre><code class="language-bash">node -e "console.log(Object.keys(require('./controllers/authController')))"</code></pre>
+<p>Expected: <code>[ 'registerUser', 'loginUser' ]</code>. If you get an error, it names the file and line.</p>
+
+<!-- ============================================================ STEP 5 -->
+<h2 id="step5">Step 5 — controllers/userController.js: users</h2>
+<p>Chapter links: <a href="03-first-server.html">3. The five CRUD routes</a>, <a href="05-async-mysql.html#query">5. db.query</a>, <a href="07-security.html#injection">7. SQL injection</a>, <a href="08-joins-cookies.html#self">8. Self join</a></p>
+<p>Six functions: get all, create, get one, update, delete, and employees with managers.</p>
+
+<h4>Part 1 of 6 — imports + retrieveAllUsers</h4>
+<div class="file-label">controllers/userController.js</div>
+<pre><code class="language-javascript">const { db } = require('../db');
+const bcrypt = require('bcrypt');
+const { validatePassword } = require('../utils/validators');
+
+// Retrieve all users
+const retrieveAllUsers = async (req, res) =&gt; {
+    try {
+        const query = "SELECT * FROM USERS";
+        const [users] = await db.query(query);
+
+        return res.status(200).json({
+            status: "success",
+            results: users.length,
+            data: users
+        });
+    } catch (error) {
+        return res.status(500).json({
+            message: "Database error",
+        });
+    }
+};</code></pre>
+<div class="callout warn"><span class="label">Different from the lecture</span>
+<p>The lecture file uses <code>validatePassword</code> in <code>createUser</code> but never imports it, so creating a user crashes with <em>“validatePassword is not defined”</em>. The third line here fixes that. (<a href="07-security.html#ex-createuser">Practice 7.7</a> is exactly this bug.)</p></div>
+
+<h4>Part 2 of 6 — createUser</h4>
+<pre><code class="language-javascript">const createUser = async (req, res) =&gt; {
+    const { username, email, password, role } = req.body;
+
+    if (!username || !email || !password || !role) {
+        return res.status(400).json({
+            message: "Please provide all required fields"
+        });
+    }
+
+    const query = `INSERT INTO USERS (USERNAME, EMAIL, PASSWORD, ROLE)
+    VALUES(?, ?, ?, ?)
+    `;
+
+    const passwordError = validatePassword(password);
+    if (passwordError) {
+        return res.status(400).json({
+            message: passwordError
+        });
+    }
+
+    try {
+        const hashedPassword = await bcrypt.hash(password, 12);
+
+        const [result] = await db.query(query, [username, email, hashedPassword, role]);
+
+        const createdUserQuery = `SELECT * FROM USERS WHERE ID = ?`;
+
+        const [newUser] = await db.query(createdUserQuery, [result.insertId]);
+
+        return res.status(201).json({
+            message: "User created successfully",
+            data: newUser[0]
+        });
+    } catch (error) {
+        return res.status(500).json({
+            message: "Database error"
+        });
+    }
+};</code></pre>
+<p>Like register, but an admin chooses the <code>role</code>. After the INSERT, <code>result.insertId</code> is the new ID, used to fetch and return the new row.</p>
+
+<h4>Part 3 of 6 — retrieveUserById</h4>
+<pre><code class="language-javascript">// Retrieve a specific user by ID
+const retrieveUserById = async (req, res) =&gt; {
+    const id = req.params.id;
+    const query = `SELECT * FROM USERS WHERE ID = ?`;
+    console.log(query)
+
+    try {
+        const [users] = await db.query(query, [id]);
+        console.log(users);
+
+        if (users.length === 0) {
+            return res.status(404).json({
+                message: "User not found"
+            });
+        }
+
+        return res.status(200).json({
+            status: "success",
+            data: users
+        });
+
+    } catch (error) {
+        return res.status(500).json({
+            message: "Database error",
+        });
+    }
+};</code></pre>
+<p>The two <code>console.log</code> lines were for debugging in class — they just print in your terminal. You can delete them.</p>
+
+<h4>Part 4 of 6 — updateUserById (partial update)</h4>
+<pre><code class="language-javascript">// Update a specific user by ID partial update
+const updateUserById = async (req, res) =&gt; {
+    const id = Number(req.params.id);
+    const { username, email, password, role } = req.body;
+
+    if (!username &amp;&amp; !email &amp;&amp; !password &amp;&amp; !role) {
+        return res.status(400).json({
+            message: "Please provide at least one field to update."
+        });
+    }
+
+    try {
+        const selectQuery = `SELECT * FROM USERS WHERE ID = ?`;
+        const [users] = await db.query(selectQuery, [id]);
+
+        if (users.length === 0) {
+            return res.status(404).json({
+                message: "User not found"
+            });
+        }
+
+        const updatedUsername = username || users[0].USERNAME;
+        const updatedEmail = email || users[0].EMAIL;
+        const updatedPassword = password ? await bcrypt.hash(password, 12) : users[0].PASSWORD;
+        const updatedRole = role || users[0].ROLE;
+
+        const query = `
+            UPDATE USERS
+            SET USERNAME = ?,
+                EMAIL = ?,
+                PASSWORD = ?,
+                ROLE = ?
+            WHERE ID = ?
+        `;
+
+        const [result] = await db.query(query, [
+            updatedUsername,
+            updatedEmail,
+            updatedPassword,
+            updatedRole,
+            id
+        ]);
+
+        if (result.affectedRows === 0) {
+            return res.status(404).json({
+                message: "User not found"
+            });
+        }
+
+        const updatedUserQuery = `SELECT * FROM USERS WHERE ID = ?`;
+        const [updatedUser] = await db.query(updatedUserQuery, [id]);
+
+        return res.status(200).json({
+            message: "User updated successfully",
+            data: updatedUser
+        });
+
+    } catch (error) {
+        return res.status(500).json({
+            message: "Database error",
+        });
+    }
+};</code></pre>
+<ol>
+  <li>Nothing sent at all → 400.</li>
+  <li>Read the current user. Not found → 404.</li>
+  <li>For each field: the new value if one was sent, otherwise the old one (<code>new || old</code> — <a href="01-javascript.html#fallback">Chapter 1</a>).</li>
+  <li>Save all four with <code>?</code> placeholders, then read the row again and return it.</li>
+</ol>
+<div class="callout warn"><span class="label">Different from the lecture (3 fixes)</span>
+<ul>
+  <li>The lecture builds the UPDATE with <code>'${updatedUsername}'</code> etc. — that's open to <strong>SQL injection</strong> (anyone can make themselves admin — try it in <a href="07-security.html#injection">Practice 7.4</a>), and a name like <em>o'brien</em> crashes it. Here: <code>?</code> placeholders.</li>
+  <li>The lecture saves a new password <strong>as plain text</strong>. Here it's hashed with bcrypt, like everywhere else — otherwise that user could never log in again.</li>
+  <li>The lecture runs the first SELECT outside <code>try</code>, so a database error there crashes the request. Here everything is inside <code>try</code>.</li>
+</ul></div>
+
+<h4>Part 5 of 6 — deleteUserById</h4>
+<pre><code class="language-javascript">// Delete a specific user by ID
+const deleteUserById = async (req, res) =&gt; {
+    const id = Number(req.params.id);
+    const query = `DELETE FROM USERS WHERE ID = ?`;
+
+    try {
+        const [result] = await db.query(query, [id]);
+
+        if (result.affectedRows === 0) {
+            return res.status(404).json({
+                message: "User not found"
+            });
+        }
+
+        return res.status(200).json({
+            message: "User deleted successfully"
+        });
+    } catch (error) {
+        return res.status(500).json({
+            message: "Database error",
+        });
+    }
+};</code></pre>
+<div class="callout warn"><span class="label">Different from the lecture</span>
+<p>The lecture writes <code>WHERE ID = ${id}</code>. Because of <code>Number(...)</code> it happens to be safe, but always using <code>?</code> is a habit that never fails. Note: deleting a user who has reviews (or is someone's manager) gives a 500 — MySQL protects the rows pointing at them (<a href="08-joins-cookies.html#relations">Chapter 8</a>).</p></div>
+
+<h4>Part 6 of 6 — getEmployeesAndManagers + export</h4>
+<pre><code class="language-javascript">const getEmployeesAndManagers = async (req, res) =&gt; {
+    try {
+        const query = `SELECT
+            e.ID,
+            e.USERNAME AS Employee,
+            m.USERNAME AS Manager
+
+            FROM USERS AS e
+
+            LEFT JOIN USERS AS m
+                ON e.MANAGER_ID = m.ID;
+        `;
+        const [users] = await db.query(query);
+
+        return res.status(200).json({
+            status: "success",
+            results: users.length,
+            data: users
+        });
+    } catch (error) {
+        return res.status(500).json({
+            message: "Database error",
+        });
+    }
+}
+
+module.exports = {
+    retrieveAllUsers,
+    createUser,
+    retrieveUserById,
+    updateUserById,
+    deleteUserById,
+    getEmployeesAndManagers
+};</code></pre>
+<p>USERS joined with itself: <code>e</code> = the employee, <code>m</code> = their manager. <code>LEFT JOIN</code> so users without a manager still appear (Manager = <code>null</code>).</p>
+<div class="callout note"><span class="label">Improvement (optional)</span>
+<p><code>SELECT *</code> on USERS sends the password <em>hash</em> to the client in get all / get one / create / update. The lecture does this; for your own project, list the columns instead: <code>SELECT ID, USERNAME, EMAIL, ROLE, MANAGER_ID FROM USERS</code>.</p></div>
+<p><strong>✔ Check:</strong></p>
+<pre><code class="language-bash">node -e "console.log(Object.keys(require('./controllers/userController')))"</code></pre>
+<p>Expected: the six function names.</p>
+
+<!-- ============================================================ STEP 6 -->
+<h2 id="step6">Step 6 — controllers/tripController.js: trips, reviews, cookie</h2>
+<p>Chapter links: <a href="05-async-mysql.html">5. Async &amp; MySQL</a>, <a href="08-joins-cookies.html">8. JOINs &amp; cookies</a></p>
+
+<h4>Part 1 of 4 — retrieveAllTrips</h4>
+<div class="file-label">controllers/tripController.js</div>
+<pre><code class="language-javascript">const { db } = require('../db');
+
+const retrieveAllTrips = async (req, res) =&gt; {
+    try {
+        const query = "SELECT * FROM TRIPS";
+        const [trips] = await db.query(query);
+
+        return res.status(200).json({
+            status: "success",
+            results: trips.length,
+            data: trips
+        });
+    } catch (error) {
+        return res.status(500).json({
+            message: 'Database error',
+        });
+    }
+};</code></pre>
+<div class="callout warn"><span class="label">Different from the lecture</span>
+<p>The lecture writes <code>query = "SELECT * FROM TRIPS";</code> without <code>const</code>. JavaScript then silently creates a <em>global</em> variable shared by everything. It works by luck; always declare with <code>const</code>.</p></div>
+
+<h4>Part 2 of 4 — retrieveTripById (sets the cookie)</h4>
+<pre><code class="language-javascript">const retrieveTripById = async (req, res) =&gt; {
+    const id = Number(req.params.id);
+
+    if (!Number.isSafeInteger(id) || id &lt;= 0) {
+        return res.status(400).json({
+            message: "Invalid trip ID"
+        });
+    }
+
+    try {
+        const query = "SELECT * FROM TRIPS WHERE ID = ?";
+        const [trips] = await db.query(query, [id]);
+
+        if (trips.length === 0) {
+            return res.status(404).json({
+                message: "Trip not found"
+            });
+        }
+
+        // Remember the last viewed trip
+        res.cookie('lastViewedTrip', String(id), {
+            maxAge: 24 * 60 * 60 * 1000, // 1 day
+            httpOnly: true,
+            secure: true,
+            sameSite: 'lax'
+        });
+
+        return res.status(200).json({
+            data: trips[0]
+        });
+
+    } catch (error) {
+        return res.status(500).json({
+            error: error.message,
+            message: "Database error"
+        });
+    }
+};</code></pre>
+<ul>
+  <li>Validate the id → 400. Find the trip → 404. Then set a cookie with the id and return the trip.</li>
+  <li>The cookie is text, so <code>String(id)</code>. <code>maxAge</code> is in milliseconds: this is <strong>1 day</strong> (the lecture comment says “1 ho”, but the number is a day — <a href="08-joins-cookies.html#cookies">see 8.7</a>).</li>
+</ul>
+
+<h4>Part 3 of 4 — getLastViewedTrip (reads the cookie)</h4>
+<pre><code class="language-javascript">const getLastViewedTrip = async (req, res) =&gt; {
+    const id = Number(req.cookies.lastViewedTrip);
+
+    if (!Number.isSafeInteger(id) || id &lt;= 0) {
+        return res.status(400).json({
+            message: "No valid last viewed trip"
+        });
+    }
+
+    try {
+        const query = "SELECT * FROM TRIPS WHERE ID = ?";
+        const [trips] = await db.query(query, [id]);
+
+        if (trips.length === 0) {
+            return res.status(404).json({
+                message: "Trip not found"
+            });
+        }
+
+        return res.status(200).json({
+            data: trips[0]
+        });
+
+    } catch (error) {
+        return res.status(500).json({
+            message: "Database error"
+        });
+    }
+};</code></pre>
+<div class="callout warn"><span class="label">Different from the lecture</span>
+<p>The lecture writes <code>FROM TRIP</code> (no S) here, so this route always fails with a 500 (“Table 'TRIP' doesn't exist”). Fixed to <code>TRIPS</code>.</p></div>
+<p><code>req.cookies</code> only exists because <code>index.js</code> will use <code>cookieParser()</code>. No cookie yet → <code>Number(undefined)</code> is <code>NaN</code> → 400.</p>
+
+<h4>Part 4 of 4 — the two JOIN routes + export</h4>
+<pre><code class="language-javascript">const getTripReviews = async (req, res) =&gt; {
+  try {
+    const query = `SELECT
+      t.DESTINATION, r.RATING, u.USERNAME
+      FROM TRIPS AS t
+      INNER JOIN REVIEWS AS r ON t.ID = r.TRIP_ID
+      INNER JOIN USERS AS u ON r.USER_ID = u.ID`;
+    const [rows] = await db.query(query);
+
+    return res.status(200).json({
+      data: rows
+    });
+
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({
+      message: 'Database error'
+    });
+  }
+};
+
+const allTripsWithRatings = async (req, res) =&gt; {
+  try {
+    const query = `SELECT t.DESTINATION, r.RATING FROM TRIPS AS t
+      LEFT JOIN REVIEWS AS r ON t.ID = r.TRIP_ID`;
+    const [results] = await db.query(query);
+    return res.status(200).json({ data: results });
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({
+      message: 'Database error'
+    });
+  }
+};
+
+module.exports = {
+  retrieveAllTrips,
+  retrieveTripById,
+  getLastViewedTrip,
+  getTripReviews,
+  allTripsWithRatings
+};</code></pre>
+<ul>
+  <li><code>getTripReviews</code>: INNER JOIN of 3 tables → who rated which trip (only trips that have reviews).</li>
+  <li><code>allTripsWithRatings</code>: LEFT JOIN → every trip, with <code>null</code> rating if nobody reviewed it.</li>
+</ul>
+<p><strong>✔ Check:</strong></p>
+<pre><code class="language-bash">node -e "console.log(Object.keys(require('./controllers/tripController')))"</code></pre>
+<p>Expected: the five function names.</p>
+
+<!-- ============================================================ STEP 7 -->
+<h2 id="step7">Step 7 — the three routes files</h2>
+<p>Chapter link: <a href="04-routes-controllers.html">4. Routes &amp; controllers</a></p>
+<p>Routes files are short: import the controller functions, connect each to a method + path, export the router. <strong>Remember the rule: fixed paths above <code>/:id</code>.</strong></p>
+<div class="file-label">routes/authRoutes.js</div>
+<pre><code class="language-javascript">const express = require('express');
+const {
+    registerUser,
+    loginUser
+} = require('../controllers/authController');
+
+const authRouter = express.Router();
+
+// Register a new user
+authRouter.post('/register', registerUser);
+
+// Login a user
+authRouter.post('/login', loginUser);
+
+module.exports = authRouter;</code></pre>
+
+<div class="file-label">routes/userRoutes.js</div>
+<pre><code class="language-javascript">const express = require('express');
+const {
+  retrieveAllUsers,
+  createUser,
+  retrieveUserById,
+  updateUserById,
+  deleteUserById,
+  getEmployeesAndManagers
+} = require('../controllers/userController');
+
+const userRouter = express.Router();
+
+// All users
+userRouter.post('/', createUser)        // Add new user
+userRouter.get('/', retrieveAllUsers);  // Get all users
+
+// Get employees and their managers (must be ABOVE '/:id')
+userRouter.get('/managers', getEmployeesAndManagers);
+
+// Specific user
+userRouter.get('/:id', retrieveUserById); // Get a specific user
+userRouter.put('/:id', updateUserById); // Update a specific user
+userRouter.delete('/:id', deleteUserById); // Delete a specific user
+
+module.exports = userRouter;</code></pre>
+
+<div class="file-label">routes/tripRoutes.js</div>
+<pre><code class="language-javascript">const express = require('express');
+const {
+    retrieveAllTrips,
+    retrieveTripById,
+    getLastViewedTrip,
+    getTripReviews,
+    allTripsWithRatings
+} = require('../controllers/tripController');
+
+const tripRouter = express.Router();
+
+tripRouter.get('/', retrieveAllTrips);
+tripRouter.get('/last-viewed', getLastViewedTrip);
+tripRouter.get('/reviews', getTripReviews);
+tripRouter.get('/ratings', allTripsWithRatings);
+tripRouter.get('/:id', retrieveTripById);   // '/:id' always LAST
+
+module.exports = tripRouter;</code></pre>
+<div class="callout warn"><span class="label">Different from the lecture</span>
+<p>In the week 8 lecture, <code>/managers</code> comes after <code>/:id</code>, and in trips, <code>/:id</code> was added at the top — above <code>/last-viewed</code>, <code>/reviews</code> and <code>/ratings</code>. (In week 7 the trips routes worked, because <code>/:id</code> didn't exist yet!) Express takes the first match, so <code>/trips/reviews</code> went to <code>retrieveTripById</code> with id = "reviews" → “Invalid trip ID”. Moving <code>/:id</code> to the bottom fixes all of them. (<a href="04-routes-controllers.html#order">Chapter 4</a>)</p></div>
+<p><strong>✔ Check:</strong></p>
+<pre><code class="language-bash">node -e "require('./routes/authRoutes'); require('./routes/userRoutes'); require('./routes/tripRoutes'); console.log('routes OK')"</code></pre>
+<p>Expected: <code>routes OK</code>. The error <em>“Route.get() requires a callback function but got a [object Undefined]”</em> means a name in the routes file doesn't match the controller's exports.</p>
+
+<!-- ============================================================ STEP 8 -->
+<h2 id="step8">Step 8 — index.js: build the app</h2>
+<p>Chapter link: <a href="04-routes-controllers.html#router">4. Router</a></p>
+<div class="file-label">index.js</div>
+<pre><code class="language-javascript">const express = require('express');
+const cookieParser = require('cookie-parser');
+const userRouter = require('./routes/userRoutes');
+const authRouter = require('./routes/authRoutes');
+const tripRouter = require('./routes/tripRoutes');
+
+// Create an instance of the Express application
+const app = express();
+
+// Use middleware to parse JSON data from request bodies
+app.use(express.json());
+app.use(cookieParser());
+
+
+app.use('/users', userRouter);
+app.use('/auth', authRouter);
+app.use('/trips', tripRouter);
+
+
+module.exports = {
+  app,
+};</code></pre>
+<ul>
+  <li><code>express.json()</code> → fills <code>req.body</code>. <code>cookieParser()</code> → fills <code>req.cookies</code>.</li>
+  <li>Each router gets its prefix: <code>/auth</code> + <code>/login</code> = <code>/auth/login</code>.</li>
+  <li>The app is exported, not started. Starting is server.js's job.</li>
+</ul>
+<p><strong>✔ Check:</strong></p>
+<pre><code class="language-bash">node -e "require('./index'); console.log('app OK')"</code></pre>
+
+<!-- ============================================================ STEP 9 -->
+<h2 id="step9">Step 9 — server.js: create the tables, then start</h2>
+<p>Chapter link: <a href="05-async-mysql.html#connect">5. server.js</a></p>
+<div class="file-label">server.js</div>
+<pre><code class="language-javascript">const { app } = require('./index.js');
+const {
+  db,
+  createUserTable,
+  createTripTable,
+  createReviewTable } = require('./db.js');
+const dotenv = require('dotenv');
+dotenv.config();
+
+async function startServer() {
+  try {
+    await db.query(createUserTable);
+    console.log('Users table created or already exists.');
+
+    await db.query(createTripTable);
+    console.log('Trips table created or already exists.');
+
+    await db.query(createReviewTable);
+    console.log('Reviews table created or already exists.');
+
+    app.listen(process.env.PORT, process.env.HOSTNAME, () =&gt; {
+      console.log(`Server is running at http://${process.env.HOSTNAME}:${process.env.PORT}`);
+    });
+  } catch (error) {
+    console.error('Error initializing the database:', error);
+    process.exitCode = 1;
+    await db.end();
+  }
+}
+
+startServer();</code></pre>
+<ul>
+  <li>The tables are created <strong>in order</strong>: REVIEWS points at USERS and TRIPS, so those must exist first.</li>
+  <li><code>IF NOT EXISTS</code> makes this safe to run every time you start.</li>
+  <li>Only when all tables are ready does the server start listening.</li>
+</ul>
+<p><strong>✔ Check — the real start:</strong></p>
+<pre><code class="language-bash">node server.js</code></pre>
+<pre><code class="nohl">Users table created or already exists.
+Trips table created or already exists.
+Reviews table created or already exists.
+Server is running at http://localhost:5000</code></pre>
+<p>🎉 The whole project is built. Refresh Workbench's Schemas panel: <code>travel_db</code> now has 3 tables.</p>
+
+<!-- ============================================================ STEP 10 -->
+<h2 id="step10">Step 10 — add test data and try everything in Postman</h2>
+<p>The tables are empty. Fill them in this order (users first, because the others point at them):</p>
+<ol class="steps">
+  <li><strong>Register three users in Postman</strong> (so their passwords are hashed properly): <code>POST http://localhost:5000/auth/register</code>, Body → raw → JSON:
+<pre><code class="language-json">{ "username": "sara", "email": "sara@mail.com", "password": "Password1!" }</code></pre>
+  Then the same for <code>omar</code> and <code>lina</code>. They get IDs 1, 2, 3.</li>
+  <li><strong>In Workbench</strong>, run this to add trips, make sara the admin and the manager of the other two, and add reviews:
+<pre><code class="language-sql">USE travel_db;
+
+INSERT INTO TRIPS (DESTINATION, COUNTRY, COST) VALUES
+  ('Paris', 'France', 1200),
+  ('Rome', 'Italy', 950.50),
+  ('Tokyo', 'Japan', 2100),
+  ('Cairo', 'Egypt', 400);
+
+UPDATE USERS SET ROLE = 'admin' WHERE ID = 1;
+UPDATE USERS SET MANAGER_ID = 1 WHERE ID IN (2, 3);
+
+INSERT INTO REVIEWS (USER_ID, TRIP_ID, RATING) VALUES
+  (2, 1, 5),
+  (3, 1, 4),
+  (2, 2, 3);</code></pre>
+  (Workbench may block the UPDATE because of “safe update mode” — if so: Edit → Preferences → SQL Editor → untick “Safe Updates”, reconnect, run again.)</li>
+</ol>
+<p>Now test every route:</p>
+<table>
+  <thead><tr><th>Request</th><th>Body (raw → JSON)</th><th>You should get</th></tr></thead>
+  <tbody>
+    <tr><td><code>POST /auth/login</code></td><td><code>{"email": "sara@mail.com", "password": "Password1!"}</code></td><td>200 + sara's info (no password)</td></tr>
+    <tr><td><code>POST /auth/login</code></td><td>same email, wrong password</td><td>401</td></tr>
+    <tr><td><code>POST /auth/register</code></td><td>sara's email again</td><td>409</td></tr>
+    <tr><td><code>GET /users</code></td><td>—</td><td>200, 3 users</td></tr>
+    <tr><td><code>GET /users/managers</code></td><td>—</td><td>200, each Employee with their Manager</td></tr>
+    <tr><td><code>GET /users/2</code></td><td>—</td><td>200, omar</td></tr>
+    <tr><td><code>POST /users</code></td><td><code>{"username": "nour", "email": "nour@mail.com", "password": "Hello123!", "role": "user"}</code></td><td>201</td></tr>
+    <tr><td><code>PUT /users/4</code></td><td><code>{"username": "nour_k"}</code></td><td>200, only the name changed</td></tr>
+    <tr><td><code>DELETE /users/4</code></td><td>—</td><td>200 (then <code>GET /users/4</code> → 404)</td></tr>
+    <tr><td><code>GET /trips</code></td><td>—</td><td>200, 4 trips</td></tr>
+    <tr><td><code>GET /trips/last-viewed</code></td><td>— (before viewing a trip)</td><td>400</td></tr>
+    <tr><td><code>GET /trips/2</code></td><td>—</td><td>200, Rome (and a cookie is set)</td></tr>
+    <tr><td><code>GET /trips/last-viewed</code></td><td>—</td><td>200, Rome</td></tr>
+    <tr><td><code>GET /trips/reviews</code></td><td>—</td><td>200, destination + rating + username</td></tr>
+    <tr><td><code>GET /trips/ratings</code></td><td>—</td><td>200, every trip, null rating for unreviewed ones</td></tr>
+  </tbody>
+</table>
+<div class="callout tip"><span class="label">If the last-viewed cookie doesn't come back in Postman</span>
+<p>The cookie has <code>secure: true</code> (“only over HTTPS”), and you're on plain <code>http://</code>. If Postman doesn't send it back, change <code>secure: true</code> to <code>secure: false</code> while testing on your computer. You can see stored cookies under the <strong>Cookies</strong> link below Postman's Send button.</p></div>
+
+<ul class="checklist" data-id="lecture-done">
+  <li>Step 1 — setup, .env, database</li>
+  <li>Step 2 — db.js (DB OK)</li>
+  <li>Step 3 — validators.js</li>
+  <li>Step 4 — authController.js</li>
+  <li>Step 5 — userController.js</li>
+  <li>Step 6 — tripController.js</li>
+  <li>Step 7 — the three routes files</li>
+  <li>Step 8 — index.js</li>
+  <li>Step 9 — server.js starts and creates the tables</li>
+  <li>Step 10 — every request in the table works in Postman</li>
+</ul>
+
+<!-- ============================================================ PLAYGROUND -->
+<h2 id="playground">The whole project, running</h2>
+<p>Here is the complete finished project — every file above — in the simulator. Press <strong>Run</strong> and send requests with the buttons. The practice database already has users <code>sara</code> (admin), <code>omar</code>, <code>lina</code>, <code>youssef</code> (password <code>Password1!</code> for all), 7 trips and 5 reviews. You can also change the code to experiment — <strong>Reset code</strong> brings it back.</p>
+<div class="runner" id="ex-lecture-full" data-express data-db data-entry="server.js">
+<textarea data-file="index.js">
+const express = require('express');
+const cookieParser = require('cookie-parser');
+const userRouter = require('./routes/userRoutes');
+const authRouter = require('./routes/authRoutes');
+const tripRouter = require('./routes/tripRoutes');
+
+// Create an instance of the Express application
+const app = express();
+
+// Use middleware to parse JSON data from request bodies
+app.use(express.json());
+app.use(cookieParser());
+
+
+app.use('/users', userRouter);
+app.use('/auth', authRouter);
+app.use('/trips', tripRouter);
+
+
+module.exports = {
+  app,
+};
+</textarea>
+<textarea data-file="server.js">
+const { app } = require('./index.js');
+const {
+  db,
+  createUserTable,
+  createTripTable,
+  createReviewTable } = require('./db.js');
+const dotenv = require('dotenv');
+dotenv.config();
+
+async function startServer() {
+  try {
+    await db.query(createUserTable);
+    console.log('Users table created or already exists.');
+
+    await db.query(createTripTable);
+    console.log('Trips table created or already exists.');
+
+    await db.query(createReviewTable);
+    console.log('Reviews table created or already exists.');
+
+    app.listen(process.env.PORT, process.env.HOSTNAME, () => {
+      console.log(`Server is running at http://${process.env.HOSTNAME}:${process.env.PORT}`);
+    });
+  } catch (error) {
+    console.error('Error initializing the database:', error);
+    process.exitCode = 1;
+    await db.end();
+  }
+}
+
+startServer();
+</textarea>
+<textarea data-file="db.js">
+const mysql = require("mysql2/promise");
+const dotenv = require("dotenv");
+dotenv.config();
+
+const db = mysql.createPool({
+    host: "localhost",
+    port: 3306,
+    user: process.env.DB_USER,
+    password: process.env.DB_PASSWORD,
+    database: process.env.DB_NAME
+}); // configs
+
+// Create User Table
+const createUserTable = `CREATE TABLE IF NOT EXISTS USERS (
+        ID INT AUTO_INCREMENT PRIMARY KEY,
+        USERNAME VARCHAR(255) NOT NULL,
+        EMAIL VARCHAR(255) UNIQUE NOT NULL,
+        PASSWORD VARCHAR(255) NOT NULL,
+        ROLE ENUM('admin', 'user') NOT NULL DEFAULT 'user',
+        MANAGER_ID INT NULL,
+        FOREIGN KEY (MANAGER_ID) REFERENCES USERS(ID)
+    );
+`;
+
+const createTripTable = `CREATE TABLE IF NOT EXISTS TRIPS (
+        ID INT AUTO_INCREMENT PRIMARY KEY,
+        DESTINATION VARCHAR(150) NOT NULL,
+        COUNTRY VARCHAR(150) NOT NULL,
+        COST DECIMAL(10,2) NOT NULL
+)`;
+
+const createReviewTable = `CREATE TABLE IF NOT EXISTS REVIEWS (
+        ID INT AUTO_INCREMENT PRIMARY KEY,
+        USER_ID INT NOT NULL,
+        TRIP_ID INT NOT NULL,
+        RATING INT NOT NULL CHECK (RATING BETWEEN 1 AND 5),
+        FOREIGN KEY (USER_ID) REFERENCES USERS(ID),
+        FOREIGN KEY (TRIP_ID) REFERENCES TRIPS(ID),
+        UNIQUE (USER_ID, TRIP_ID)
+)`;
+
+module.exports = {
+    db,
+    createUserTable,
+    createTripTable,
+    createReviewTable
+}
+</textarea>
+<textarea data-file=".env">
+HOSTNAME=localhost
+PORT=5000
+
+DB_USER=root
+DB_PASSWORD=my_secret_pw
+DB_NAME=travel_db
+</textarea>
+<textarea data-file="utils/validators.js">
+const sanitizeInput = (value) => {
+    if (typeof value !== 'string') return '';
+    return value.trim().toLowerCase();
+};
+
+const isValidEmail = (email) => {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return typeof email === 'string' && emailRegex.test(email);
+};
+
+const isStrongPassword = (password) => {
+    if (typeof password !== 'string') return false;
+
+    const passRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[\W_]).{8,}$/;
+    return passRegex.test(password);
+};
+
+const validateRequired = (fields, requiredKeys) => {
+    for (const key of requiredKeys) {
+        if (typeof fields[key] !== 'string' ||
+            !fields[key].trim()) {
+            return `${key} is required`;
+        }
+    }
+    return null;
+};
+
+const validateEmail = (email) => {
+    if (!email) return 'Email is required';
+    if (!isValidEmail(email)) return 'Invalid email format';
+    return null;
+};
+
+const validatePassword = (password) => {
+    if (!password) return 'Password is required';
+    if (!isStrongPassword(password)) {
+        return 'Password must have 8+ chars, upper, lower, number, and special char';
+    }
+    return null;
+};
+
+module.exports = {
+    sanitizeInput,
+    isValidEmail,
+    isStrongPassword,
+    validateRequired,
+    validateEmail,
+    validatePassword
+};
+</textarea>
+<textarea data-file="controllers/authController.js">
+const bcrypt = require('bcrypt');
+const { db } = require('../db');
+const dotenv = require('dotenv');
+dotenv.config();
+
+const {
+    sanitizeInput,
+    validateRequired,
+    validateEmail,
+    validatePassword
+} = require('../utils/validators');
+
+const registerUser = async (req, res) => {
+    const { username, email, password } = req.body;
+
+    // 1. Clean input
+    const cleanUsername = sanitizeInput(username);
+    const cleanEmail = sanitizeInput(email);
+
+    // Do NOT trim or lowercase passwords
+    const cleanPassword = password;
+
+    // 2. Check required fields
+    const requiredError = validateRequired(
+        {
+            username: cleanUsername,
+            email: cleanEmail,
+            password: cleanPassword
+        },
+        ['username', 'email', 'password']
+    );
+
+    if (requiredError) {
+        return res.status(400).json({
+            message: requiredError
+        });
+    }
+
+    // 3. Validate email
+    const emailError = validateEmail(cleanEmail);
+
+    if (emailError) {
+        return res.status(400).json({
+            message: emailError
+        });
+    }
+
+    // 4. Validate password
+    const passwordError = validatePassword(cleanPassword);
+
+    if (passwordError) {
+        return res.status(400).json({
+            message: passwordError
+        });
+    }
+
+    // 5. Hash password using bcrypt
+    try {
+        const hashedPassword = await bcrypt.hash(cleanPassword, 12);
+
+        // 6. Parameterized query
+        const query = `
+            INSERT INTO USERS (USERNAME, EMAIL, PASSWORD, ROLE)
+            VALUES (?, ?, ?, ?)
+        `;
+
+        const [result] = await db.query(query, [
+            cleanUsername,
+            cleanEmail,
+            hashedPassword,
+            'user'
+        ]);
+
+        return res.status(201).json({
+            message: 'User registered successfully'
+        });
+
+    } catch (error) {
+        if (error.code === 'ER_DUP_ENTRY') {
+            return res.status(409).json({
+                message: 'Email already exists'
+            });
+        }
+
+        return res.status(500).json({
+            message: 'Registration error'
+        });
+    }
+};
+
+const loginUser = async (req, res) => {
+    const { email, password } = req.body;
+
+    const cleanEmail = sanitizeInput(email);
+
+    if (!cleanEmail || !password) {
+        return res.status(400).json({
+            message: 'Please provide both email and password.'
+        });
+    }
+
+    // Parameterized query prevents SQL injection
+    const query = `
+        SELECT * FROM USERS WHERE EMAIL = ?
+    `;
+
+    try {
+        const [users] = await db.query(query, [
+            cleanEmail
+        ]);
+
+        if (users.length === 0) {
+            return res.status(401).json({
+                message: 'Invalid email or password.'
+            });
+        }
+
+        const user = users[0];
+
+        // Compare entered password with stored hash
+        const isMatch = await bcrypt.compare(
+            password,
+            user.PASSWORD
+        );
+
+        if (!isMatch) {
+            return res.status(401).json({
+                message: 'Invalid email or password.'
+            });
+        }
+
+        return res.status(200).json({
+            message: 'User logged in successfully',
+            user: {
+                id: user.ID,
+                username: user.USERNAME,
+                email: user.EMAIL,
+                role: user.ROLE
+            }
+        });
+
+    } catch (error) {
+        return res.status(500).json({
+            message: 'Login error'
+        });
+    }
+};
+
+module.exports = {
+    registerUser,
+    loginUser
+};
+</textarea>
+<textarea data-file="controllers/userController.js">
+const { db } = require('../db');
+const bcrypt = require('bcrypt');
+const { validatePassword } = require('../utils/validators');
+
+// Retrieve all users
+const retrieveAllUsers = async (req, res) => {
+    try {
+        const query = "SELECT * FROM USERS";
+        const [users] = await db.query(query);
+
+        return res.status(200).json({
+            status: "success",
+            results: users.length,
+            data: users
+        });
+    } catch (error) {
+        return res.status(500).json({
+            message: "Database error",
+        });
+    }
+};
+
+const createUser = async (req, res) => {
+    const { username, email, password, role } = req.body;
+
+    if (!username || !email || !password || !role) {
+        return res.status(400).json({
+            message: "Please provide all required fields"
+        });
+    }
+
+    const query = `INSERT INTO USERS (USERNAME, EMAIL, PASSWORD, ROLE)
+    VALUES(?, ?, ?, ?)
+    `;
+
+    const passwordError = validatePassword(password);
+    if (passwordError) {
+        return res.status(400).json({
+            message: passwordError
+        });
+    }
+
+    try {
+        const hashedPassword = await bcrypt.hash(password, 12);
+
+        const [result] = await db.query(query, [username, email, hashedPassword, role]);
+
+        const createdUserQuery = `SELECT * FROM USERS WHERE ID = ?`;
+
+        const [newUser] = await db.query(createdUserQuery, [result.insertId]);
+
+        return res.status(201).json({
+            message: "User created successfully",
+            data: newUser[0]
+        });
+    } catch (error) {
+        return res.status(500).json({
+            message: "Database error"
+        });
+    }
+};
+
+// Retrieve a specific user by ID
+const retrieveUserById = async (req, res) => {
+    const id = req.params.id;
+    const query = `SELECT * FROM USERS WHERE ID = ?`;
+    console.log(query)
+
+    try {
+        const [users] = await db.query(query, [id]);
+        console.log(users);
+
+        if (users.length === 0) {
+            return res.status(404).json({
+                message: "User not found"
+            });
+        }
+
+        return res.status(200).json({
+            status: "success",
+            data: users
+        });
+
+    } catch (error) {
+        return res.status(500).json({
+            message: "Database error",
+        });
+    }
+};
+
+// Update a specific user by ID partial update
+const updateUserById = async (req, res) => {
+    const id = Number(req.params.id);
+    const { username, email, password, role } = req.body;
+
+    if (!username && !email && !password && !role) {
+        return res.status(400).json({
+            message: "Please provide at least one field to update."
+        });
+    }
+
+    try {
+        const selectQuery = `SELECT * FROM USERS WHERE ID = ?`;
+        const [users] = await db.query(selectQuery, [id]);
+
+        if (users.length === 0) {
+            return res.status(404).json({
+                message: "User not found"
+            });
+        }
+
+        const updatedUsername = username || users[0].USERNAME;
+        const updatedEmail = email || users[0].EMAIL;
+        const updatedPassword = password ? await bcrypt.hash(password, 12) : users[0].PASSWORD;
+        const updatedRole = role || users[0].ROLE;
+
+        const query = `
+            UPDATE USERS
+            SET USERNAME = ?,
+                EMAIL = ?,
+                PASSWORD = ?,
+                ROLE = ?
+            WHERE ID = ?
+        `;
+
+        const [result] = await db.query(query, [
+            updatedUsername,
+            updatedEmail,
+            updatedPassword,
+            updatedRole,
+            id
+        ]);
+
+        if (result.affectedRows === 0) {
+            return res.status(404).json({
+                message: "User not found"
+            });
+        }
+
+        const updatedUserQuery = `SELECT * FROM USERS WHERE ID = ?`;
+        const [updatedUser] = await db.query(updatedUserQuery, [id]);
+
+        return res.status(200).json({
+            message: "User updated successfully",
+            data: updatedUser
+        });
+
+    } catch (error) {
+        return res.status(500).json({
+            message: "Database error",
+        });
+    }
+};
+
+// Delete a specific user by ID
+const deleteUserById = async (req, res) => {
+    const id = Number(req.params.id);
+    const query = `DELETE FROM USERS WHERE ID = ?`;
+
+    try {
+        const [result] = await db.query(query, [id]);
+
+        if (result.affectedRows === 0) {
+            return res.status(404).json({
+                message: "User not found"
+            });
+        }
+
+        return res.status(200).json({
+            message: "User deleted successfully"
+        });
+    } catch (error) {
+        return res.status(500).json({
+            message: "Database error",
+        });
+    }
+};
+
+const getEmployeesAndManagers = async (req, res) => {
+    try {
+        const query = `SELECT
+            e.ID,
+            e.USERNAME AS Employee,
+            m.USERNAME AS Manager
+
+            FROM USERS AS e
+
+            LEFT JOIN USERS AS m
+                ON e.MANAGER_ID = m.ID;
+        `;
+        const [users] = await db.query(query);
+
+        return res.status(200).json({
+            status: "success",
+            results: users.length,
+            data: users
+        });
+    } catch (error) {
+        return res.status(500).json({
+            message: "Database error",
+        });
+    }
+}
+
+module.exports = {
+    retrieveAllUsers,
+    createUser,
+    retrieveUserById,
+    updateUserById,
+    deleteUserById,
+    getEmployeesAndManagers
+};
+</textarea>
+<textarea data-file="controllers/tripController.js">
+const { db } = require('../db');
+
+const retrieveAllTrips = async (req, res) => {
+    try {
+        const query = "SELECT * FROM TRIPS";
+        const [trips] = await db.query(query);
+
+        return res.status(200).json({
+            status: "success",
+            results: trips.length,
+            data: trips
+        });
+    } catch (error) {
+        return res.status(500).json({
+            message: 'Database error',
+        });
+    }
+};
+
+const retrieveTripById = async (req, res) => {
+    const id = Number(req.params.id);
+
+    if (!Number.isSafeInteger(id) || id <= 0) {
+        return res.status(400).json({
+            message: "Invalid trip ID"
+        });
+    }
+
+    try {
+        const query = "SELECT * FROM TRIPS WHERE ID = ?";
+        const [trips] = await db.query(query, [id]);
+
+        if (trips.length === 0) {
+            return res.status(404).json({
+                message: "Trip not found"
+            });
+        }
+
+        // Remember the last viewed trip
+        res.cookie('lastViewedTrip', String(id), {
+            maxAge: 24 * 60 * 60 * 1000, // 1 day
+            httpOnly: true,
+            secure: true,
+            sameSite: 'lax'
+        });
+
+        return res.status(200).json({
+            data: trips[0]
+        });
+
+    } catch (error) {
+        return res.status(500).json({
+            error: error.message,
+            message: "Database error"
+        });
+    }
+};
+
+const getLastViewedTrip = async (req, res) => {
+    const id = Number(req.cookies.lastViewedTrip);
+
+    if (!Number.isSafeInteger(id) || id <= 0) {
+        return res.status(400).json({
+            message: "No valid last viewed trip"
+        });
+    }
+
+    try {
+        const query = "SELECT * FROM TRIPS WHERE ID = ?";
+        const [trips] = await db.query(query, [id]);
+
+        if (trips.length === 0) {
+            return res.status(404).json({
+                message: "Trip not found"
+            });
+        }
+
+        return res.status(200).json({
+            data: trips[0]
+        });
+
+    } catch (error) {
+        return res.status(500).json({
+            message: "Database error"
+        });
+    }
+};
+
+const getTripReviews = async (req, res) => {
+  try {
+    const query = `SELECT
+      t.DESTINATION, r.RATING, u.USERNAME
+      FROM TRIPS AS t
+      INNER JOIN REVIEWS AS r ON t.ID = r.TRIP_ID
+      INNER JOIN USERS AS u ON r.USER_ID = u.ID`;
+    const [rows] = await db.query(query);
+
+    return res.status(200).json({
+      data: rows
+    });
+
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({
+      message: 'Database error'
+    });
+  }
+};
+
+const allTripsWithRatings = async (req, res) => {
+  try {
+    const query = `SELECT t.DESTINATION, r.RATING FROM TRIPS AS t
+      LEFT JOIN REVIEWS AS r ON t.ID = r.TRIP_ID`;
+    const [results] = await db.query(query);
+    return res.status(200).json({ data: results });
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({
+      message: 'Database error'
+    });
+  }
+};
+
+module.exports = {
+  retrieveAllTrips,
+  retrieveTripById,
+  getLastViewedTrip,
+  getTripReviews,
+  allTripsWithRatings
+};
+</textarea>
+<textarea data-file="routes/authRoutes.js">
+const express = require('express');
+const {
+    registerUser,
+    loginUser
+} = require('../controllers/authController');
+
+const authRouter = express.Router();
+
+// Register a new user
+authRouter.post('/register', registerUser);
+
+// Login a user
+authRouter.post('/login', loginUser);
+
+module.exports = authRouter;
+</textarea>
+<textarea data-file="routes/userRoutes.js">
+const express = require('express');
+const {
+  retrieveAllUsers,
+  createUser,
+  retrieveUserById,
+  updateUserById,
+  deleteUserById,
+  getEmployeesAndManagers
+} = require('../controllers/userController');
+
+const userRouter = express.Router();
+
+// All users
+userRouter.post('/', createUser)        // Add new user
+userRouter.get('/', retrieveAllUsers);  // Get all users
+
+// Get employees and their managers (must be ABOVE '/:id')
+userRouter.get('/managers', getEmployeesAndManagers);
+
+// Specific user
+userRouter.get('/:id', retrieveUserById); // Get a specific user
+userRouter.put('/:id', updateUserById); // Update a specific user
+userRouter.delete('/:id', deleteUserById); // Delete a specific user
+
+module.exports = userRouter;
+</textarea>
+<textarea data-file="routes/tripRoutes.js">
+const express = require('express');
+const {
+    retrieveAllTrips,
+    retrieveTripById,
+    getLastViewedTrip,
+    getTripReviews,
+    allTripsWithRatings
+} = require('../controllers/tripController');
+
+const tripRouter = express.Router();
+
+tripRouter.get('/', retrieveAllTrips);
+tripRouter.get('/last-viewed', getLastViewedTrip);
+tripRouter.get('/reviews', getTripReviews);
+tripRouter.get('/ratings', allTripsWithRatings);
+tripRouter.get('/:id', retrieveTripById);   // '/:id' always LAST
+
+module.exports = tripRouter;
+</textarea>
+<script type="text/plain" class="tests">
+_test('the 3 tables are created and the server starts', () => _logs.some(l => l.text.startsWith('Server is running')) || 'the server did not start');
+_test('register → login works (201, then 200)', async () => { const a = await _req('POST', '/auth/register', { username: 'nour', email: 'nour@mail.com', password: 'Hello123!' }); _eq(a.status, 201, 'register status'); return _eq((await _req('POST', '/auth/login', { email: 'nour@mail.com', password: 'Hello123!' })).status, 200, 'login status'); });
+_test('users: list, managers, update, delete', async () => { _eq((await _req('GET', '/users')).status, 200, 'GET /users'); _eq(((await _req('GET', '/users/managers')).body.data || []).length, 5, 'managers rows'); _eq((await _req('PUT', '/users/5', { username: "o'brien" })).status, 200, 'PUT'); return _eq((await _req('DELETE', '/users/5')).status, 200, 'DELETE'); });
+_test('trips: list, one, last viewed (cookie), reviews, ratings', async () => { _eq((await _req('GET', '/trips')).body.results, 7, 'trips'); _eq((await _req('GET', '/trips/2')).status, 200, 'GET /trips/2'); _eq(((await _req('GET', '/trips/last-viewed')).body.data || {}).DESTINATION, 'Rome', 'last viewed'); _eq(((await _req('GET', '/trips/reviews')).body.data || []).length, 5, 'reviews'); return _eq(((await _req('GET', '/trips/ratings')).body.data || []).length, 8, 'ratings'); });
+</script>
+<script type="text/plain" class="tries">
+POST /auth/register {"username": "nour", "email": "nour@mail.com", "password": "Hello123!"}
+POST /auth/login {"email": "sara@mail.com", "password": "Password1!"}
+POST /auth/login {"email": "sara@mail.com", "password": "wrong"}
+GET /users
+GET /users/managers
+GET /users/2
+POST /users {"username": "kim", "email": "kim@mail.com", "password": "Hello123!", "role": "user"}
+PUT /users/3 {"username": "lina_k"}
+GET /trips
+GET /trips/last-viewed
+GET /trips/2
+GET /trips/reviews
+GET /trips/ratings
+</script>
+</div>
+<p>Click the file tabs to see each file. The checks under the code confirm the finished project works from start to end.</p>
+
+<div class="callout tip"><span class="label">Next</span>
+<p>Once you've built this yourself, try <a href="09-build-it.html">Chapter 9</a>: build it again from an empty folder <em>without</em> this page open. That's the real test — and the best preparation for your final project.</p></div>
+</main>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/javascript/javascript.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/sql/sql.min.js"></script>
+<script src="assets/app.js"></script>
+</body>
+</html>

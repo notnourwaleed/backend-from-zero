@@ -1,0 +1,269 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>How the Web Works · Backend from Zero</title>
+<meta name="description" content="Requests, responses, URLs, HTTP methods, status codes and JSON — explained simply.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=JetBrains+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.css">
+<link rel="stylesheet" href="assets/style.css">
+<script>try{var t=localStorage.getItem('bfz-theme');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body data-page="02-how-the-web-works.html">
+<main>
+<div class="kicker">Chapter 2</div>
+<h1>How the web works</h1>
+<p class="lead">Before writing a server, you need a picture of what a server <em>does</em>. It's simpler than it sounds: something asks, the server answers.</p>
+
+<h2 id="client-server">Client and server</h2>
+<p>A <strong>client</strong> is whatever asks for something: a browser, a phone app, or Postman. A <strong>server</strong> is a program that waits for questions and answers them. Your backend is a server.</p>
+<div class="callout analogy"><span class="label">Think of a restaurant</span>
+<ul>
+  <li><strong>You (the customer)</strong> = the client. You place an order.</li>
+  <li><strong>The order</strong> = the <em>request</em>: “one pizza, no onions”.</li>
+  <li><strong>The waiter</strong> = the <em>route</em>: hears the order and takes it to the right cook.</li>
+  <li><strong>The cook</strong> = the <em>controller</em>: does the actual work.</li>
+  <li><strong>The fridge</strong> = the <em>database</em>: where ingredients (data) are kept.</li>
+  <li><strong>The plate that comes back</strong> = the <em>response</em>. If they don't have pizza, you get a polite “sorry, not available” — that's an error response.</li>
+</ul></div>
+
+<div class="diagram" role="img" aria-label="Diagram: a client sends a request to the server; the route passes it to a controller; the controller asks the database; the server sends back a response.">
+<svg viewBox="0 0 720 270" width="720" height="270">
+  <defs>
+    <marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="muted"/></marker>
+  </defs>
+  <rect class="box-a" x="10" y="85" width="150" height="100" rx="12"/>
+  <text x="85" y="128" text-anchor="middle" font-weight="700">Client</text>
+  <text x="85" y="150" text-anchor="middle" class="muted small">browser, app,</text>
+  <text x="85" y="166" text-anchor="middle" class="muted small">Postman</text>
+
+  <rect class="box" x="265" y="20" width="210" height="230" rx="14"/>
+  <text x="370" y="46" text-anchor="middle" font-weight="700">Your server</text>
+  <text x="370" y="64" text-anchor="middle" class="muted small">Node.js + Express</text>
+  <rect class="box-w" x="290" y="85" width="160" height="56" rx="10"/>
+  <text x="370" y="110" text-anchor="middle" font-weight="600">Route</text>
+  <text x="370" y="128" text-anchor="middle" class="muted small">“which function?”</text>
+  <rect class="box-g" x="290" y="168" width="160" height="56" rx="10"/>
+  <text x="370" y="193" text-anchor="middle" font-weight="600">Controller</text>
+  <text x="370" y="211" text-anchor="middle" class="muted small">“do the work”</text>
+  <line class="arrow" x1="370" y1="141" x2="370" y2="164" marker-end="url(#ah)"/>
+
+  <rect class="box-p" x="575" y="85" width="135" height="100" rx="12"/>
+  <text x="642" y="128" text-anchor="middle" font-weight="700">MySQL</text>
+  <text x="642" y="150" text-anchor="middle" class="muted small">tables with</text>
+  <text x="642" y="166" text-anchor="middle" class="muted small">your data</text>
+
+  <line class="arrow" x1="160" y1="108" x2="286" y2="108" marker-end="url(#ah)"/>
+  <text x="222" y="98" text-anchor="middle" class="small mono">GET /users/3</text>
+  <line class="arrow" x1="290" y1="205" x2="164" y2="165" marker-end="url(#ah)"/>
+  <text x="200" y="215" text-anchor="middle" class="small mono">200 + JSON</text>
+
+  <line class="arrow" x1="450" y1="186" x2="571" y2="150" marker-end="url(#ah)"/>
+  <text x="520" y="152" text-anchor="middle" class="small mono">SQL</text>
+  <line class="arrow" x1="575" y1="175" x2="454" y2="210" marker-end="url(#ah)"/>
+  <text x="522" y="214" text-anchor="middle" class="small mono">rows</text>
+</svg>
+</div>
+<p class="caption">Every single request follows this path. Keep this picture in your head for the whole course.</p>
+
+<h2 id="request">What's inside a request</h2>
+<table>
+  <thead><tr><th>Part</th><th>What it is</th><th>Example</th></tr></thead>
+  <tbody>
+    <tr><td><strong>Method</strong></td><td>The verb — what do you want to do?</td><td><code>GET</code>, <code>POST</code>, <code>PUT</code>, <code>DELETE</code></td></tr>
+    <tr><td><strong>URL</strong></td><td>Where — which thing?</td><td><code>/users/3</code></td></tr>
+    <tr><td><strong>Body</strong></td><td>Extra data you send (only for POST/PUT)</td><td><code>{ "username": "sara" }</code></td></tr>
+    <tr><td><strong>Headers</strong></td><td>Small notes about the request (type of data, cookies…)</td><td><code>Content-Type: application/json</code></td></tr>
+  </tbody>
+</table>
+
+<h3>The parts of a URL</h3>
+<div class="url-anatomy"><span class="u1" data-l="protocol">http://</span><span class="u2" data-l="host (which computer)">localhost</span><span class="u1">:</span><span class="u3" data-l="port (which door)">5000</span><span class="u4" data-l="path">/users</span><span class="u5" data-l="route parameter">/3</span><span class="u6" data-l="query string (?key=value)">?sort=name</span></div>
+<ul>
+  <li><strong>localhost</strong> means “this same computer”. <code>127.0.0.1</code> is the same thing written as a number.</li>
+  <li><strong>Port</strong>: a computer has many “doors”. Your server listens at one of them (like <code>3000</code> or <code>5000</code>). Only one program can use a door at a time.</li>
+  <li><strong>Route parameter</strong>: a changing part of the path, like the id. In Express you write it as <code>/users/:id</code> and read it with <code>req.params.id</code>.</li>
+  <li><strong>Query string</strong>: optional extras after <code>?</code>, read with <code>req.query</code>.</li>
+</ul>
+
+<div class="exercise">
+  <span class="ex-tag">Practice 2.1</span>
+  <div class="blanks">
+<p>For the URL <code>http://127.0.0.1:3000/trips/12?country=Italy</code> fill in:</p>
+<pre><code class="nohl">The port is:              <input data-a="3000">
+The path (without query): <input data-a="/trips/12">
+The route parameter is:   <input data-a="12">
+The query string is:      <input data-a="country=Italy|||?country=Italy"></code></pre>
+  </div>
+</div>
+
+<h2 id="methods">Methods = the four actions (CRUD)</h2>
+<p>Almost every app does four things with data: <strong>C</strong>reate, <strong>R</strong>ead, <strong>U</strong>pdate, <strong>D</strong>elete. Each has its own HTTP method:</p>
+<table>
+  <thead><tr><th>Action</th><th>Method</th><th>URL</th><th>Example meaning</th></tr></thead>
+  <tbody>
+    <tr><td>Read all</td><td><code>GET</code></td><td><code>/users</code></td><td>Give me all users</td></tr>
+    <tr><td>Read one</td><td><code>GET</code></td><td><code>/users/3</code></td><td>Give me user 3</td></tr>
+    <tr><td>Create</td><td><code>POST</code></td><td><code>/users</code></td><td>Here's a new user (in the body), save it</td></tr>
+    <tr><td>Update</td><td><code>PUT</code> (or <code>PATCH</code>)</td><td><code>/users/3</code></td><td>Change user 3 (new values in the body)</td></tr>
+    <tr><td>Delete</td><td><code>DELETE</code></td><td><code>/users/3</code></td><td>Remove user 3</td></tr>
+  </tbody>
+</table>
+<p>See the pattern? The URL says <strong>which thing</strong> (plural noun: <code>/users</code>, <code>/trips</code>), the method says <strong>what to do</strong>. That's called a <strong>REST API</strong>.</p>
+
+<div class="exercise">
+  <span class="ex-tag">Practice 2.2</span>
+  <div class="quiz">
+    <p class="q">A user wants to change their email. Which request?</p>
+    <div class="options">
+      <button data-why="POST creates something new. The user already exists.">POST /users</button>
+      <button data-correct>PUT /users/5</button>
+      <button data-why="GET only reads. It never changes anything.">GET /users/5/change-email</button>
+    </div>
+    <div class="explain">Update = <code>PUT</code> (or <code>PATCH</code>) on the specific user, with the new email in the body.</div>
+  </div>
+  <div class="quiz">
+    <p class="q">Which request creates a new trip?</p>
+    <div class="options">
+      <button data-correct>POST /trips</button>
+      <button data-why="You don't know the new id yet — the database gives it.">POST /trips/8</button>
+      <button data-why="Verbs don't go in the URL in REST. The method is the verb.">GET /trips/create</button>
+    </div>
+    <div class="explain">Create = <code>POST</code> to the plural noun. The database chooses the new id.</div>
+  </div>
+</div>
+
+<h2 id="status">The response: status code + body</h2>
+<p>Every response has a <strong>status code</strong> — a 3-digit number that says how it went — and usually a <strong>body</strong> with data in JSON.</p>
+<table>
+  <thead><tr><th>Code</th><th>Name</th><th>Use it when…</th></tr></thead>
+  <tbody>
+    <tr><td><code>200</code></td><td>OK</td><td>Everything worked (read, update, delete)</td></tr>
+    <tr><td><code>201</code></td><td>Created</td><td>You created something new (POST)</td></tr>
+    <tr><td><code>400</code></td><td>Bad Request</td><td>The client sent wrong or missing data</td></tr>
+    <tr><td><code>401</code></td><td>Unauthorized</td><td>Wrong email/password, not logged in</td></tr>
+    <tr><td><code>403</code></td><td>Forbidden</td><td>Logged in, but not allowed (e.g. not admin)</td></tr>
+    <tr><td><code>404</code></td><td>Not Found</td><td>The thing doesn't exist (user 999)</td></tr>
+    <tr><td><code>409</code></td><td>Conflict</td><td>It already exists (email already used)</td></tr>
+    <tr><td><code>500</code></td><td>Internal Server Error</td><td>Something broke on the server (database error, bug)</td></tr>
+  </tbody>
+</table>
+<div class="callout tip"><span class="label">Easy way to remember</span>
+<p><strong>2xx</strong> = “yes, done” · <strong>4xx</strong> = “<em>you</em> (the client) made a mistake” · <strong>5xx</strong> = “<em>I</em> (the server) made a mistake”.</p></div>
+
+<div class="exercise">
+  <span class="ex-tag">Practice 2.3 — status code game</span>
+  <div class="quiz">
+    <p class="q">Someone registers, but forgot to send a password.</p>
+    <div class="options"><button data-correct>400</button><button data-why="401 is for wrong login details, not missing fields.">401</button><button data-why="Nothing broke on the server — the client sent bad data.">500</button></div>
+    <div class="explain">Missing/invalid data from the client → <code>400 Bad Request</code>.</div>
+  </div>
+  <div class="quiz">
+    <p class="q">Someone logs in with the wrong password.</p>
+    <div class="options"><button data-why="The data is complete; it's just not correct credentials.">400</button><button data-correct>401</button><button data-why="403 means 'I know who you are, but you're not allowed'.">403</button></div>
+    <div class="explain">Wrong credentials → <code>401 Unauthorized</code>.</div>
+  </div>
+  <div class="quiz">
+    <p class="q"><code>GET /trips/999</code>, and there is no trip with id 999.</p>
+    <div class="options"><button data-why="The request itself is fine — the trip just doesn't exist.">400</button><button data-correct>404</button><button data-why="Nothing is broken.">500</button></div>
+    <div class="explain">The thing doesn't exist → <code>404 Not Found</code>.</div>
+  </div>
+  <div class="quiz">
+    <p class="q">Someone registers with an email that is already in the database.</p>
+    <div class="options"><button data-why="Close! But there's a more exact code for 'already exists'.">400</button><button data-correct>409</button><button data-why="That's for 'created successfully'.">201</button></div>
+    <div class="explain">“It already exists” → <code>409 Conflict</code>.</div>
+  </div>
+  <div class="quiz">
+    <p class="q">A new user was saved successfully.</p>
+    <div class="options"><button data-why="200 works, but there's a more exact one for creating.">200</button><button data-correct>201</button><button data-why="That's 'Not Found'.">404</button></div>
+    <div class="explain">Something new was created → <code>201 Created</code>.</div>
+  </div>
+  <div class="quiz">
+    <p class="q">The MySQL server is turned off, so your query fails.</p>
+    <div class="options"><button data-why="The client did nothing wrong.">400</button><button data-why="The user might exist — you just can't check.">404</button><button data-correct>500</button></div>
+    <div class="explain">The server's own problem → <code>500 Internal Server Error</code>. That's why every database call goes in <code>try/catch</code> with a 500 in the catch.</div>
+  </div>
+</div>
+
+<h2 id="json">JSON: the language of APIs</h2>
+<p>Servers and clients send data as <strong>JSON</strong> (JavaScript Object Notation). It looks almost exactly like a JavaScript object, but it's <strong>text</strong> and it's stricter:</p>
+<pre><code class="language-json">{
+  "id": 3,
+  "username": "lina",
+  "roles": ["user"],
+  "active": true,
+  "manager": null
+}</code></pre>
+<ul>
+  <li>Keys <strong>must</strong> have double quotes: <code>"username"</code> (not <code>username</code> or <code>'username'</code>).</li>
+  <li>Text values use double quotes too. Numbers, <code>true</code>, <code>false</code>, <code>null</code> don't.</li>
+  <li>No comma after the last item. No comments. No functions.</li>
+</ul>
+<p>In JavaScript you convert between the two:</p>
+<pre><code class="language-javascript">const obj = JSON.parse('{"name": "sara"}');   // text → object
+const text = JSON.stringify({ name: "sara" }); // object → text '{"name":"sara"}'</code></pre>
+<p>Good news: Express does this for you. <code>express.json()</code> turns the request body text into <code>req.body</code>, and <code>res.json(obj)</code> turns your object into JSON text. But you need to know what's happening — and you'll type JSON by hand in Postman.</p>
+
+<div class="exercise">
+  <span class="ex-tag">Practice 2.4</span>
+  <div class="quiz">
+    <p class="q">Which one is valid JSON (you could paste it in Postman's body)?</p>
+    <div class="options">
+      <button data-why="Keys need double quotes in JSON.">{ username: "sara" }</button>
+      <button data-why="JSON doesn't allow single quotes.">{ 'username': 'sara' }</button>
+      <button data-correct>{ "username": "sara", "age": 20 }</button>
+      <button data-why="No comma allowed after the last item.">{ "username": "sara", }</button>
+    </div>
+    <div class="explain">Double quotes on keys and on text. Numbers have no quotes.</div>
+  </div>
+  <div class="runner" id="ex-json">
+<textarea data-file="main.js">
+// A client sent this JSON text in the request body:
+const rawBody = '{"username": "sara", "email": "sara@mail.com"}';
+
+// TODO 1: turn the text into a JavaScript object called body (JSON.parse)
+
+// TODO 2: make response = an object with status "success" and data = body
+//         → { status: "success", data: body }
+
+// TODO 3: make responseText = the response turned into JSON text (JSON.stringify)
+
+console.log(body.username);
+console.log(responseText);
+</textarea>
+<script type="text/plain" class="tests">
+_test('body is an object and body.username is "sara"', () => _eq(body.username, 'sara', 'body.username'));
+_test('response is { status: "success", data: body }', () => _eq(response, { status: 'success', data: { username: 'sara', email: 'sara@mail.com' } }, 'response'));
+_test('responseText is the JSON text of response', () => _eq(responseText, '{"status":"success","data":{"username":"sara","email":"sara@mail.com"}}', 'responseText'));
+</script>
+<script type="text/plain" class="solution">
+const rawBody = '{"username": "sara", "email": "sara@mail.com"}';
+
+const body = JSON.parse(rawBody);
+const response = { status: "success", data: body };
+const responseText = JSON.stringify(response);
+
+console.log(body.username);
+console.log(responseText);
+</script>
+  </div>
+</div>
+
+<h2 id="summary">Summary</h2>
+<ul>
+  <li>The <strong>client</strong> sends a <strong>request</strong>: method + URL (+ body).</li>
+  <li>The <strong>server</strong> finds the matching <strong>route</strong>, runs the <strong>controller</strong>, maybe talks to the <strong>database</strong>.</li>
+  <li>The server sends a <strong>response</strong>: status code + JSON body.</li>
+</ul>
+<p>Next chapter you build that server. 🚀</p>
+</main>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/javascript/javascript.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/sql/sql.min.js"></script>
+<script src="assets/app.js"></script>
+</body>
+</html>

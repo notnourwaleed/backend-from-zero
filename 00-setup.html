@@ -1,0 +1,251 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Set Up Your Computer · Backend from Zero</title>
+<meta name="description" content="Install VS Code, Node.js, npm, MySQL and Postman from zero.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=JetBrains+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.css">
+<link rel="stylesheet" href="assets/style.css">
+<script>try{var t=localStorage.getItem('bfz-theme');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body data-page="00-setup.html">
+<main>
+<div class="kicker">Chapter 0</div>
+<h1>Set up your computer</h1>
+<p class="lead">Before writing a server you need the right tools. This chapter starts from absolute zero: how to make a file, how to open a terminal, how to install everything.</p>
+
+<h2 id="what">What you need (and why)</h2>
+<table>
+  <thead><tr><th>Tool</th><th>What it is</th><th>Comparison</th></tr></thead>
+  <tbody>
+    <tr><td><strong>VS Code</strong></td><td>The program where you write code.</td><td>Like Word, but for code.</td></tr>
+    <tr><td><strong>Terminal</strong></td><td>A window where you type commands instead of clicking.</td><td>Talking to your computer by text message.</td></tr>
+    <tr><td><strong>Node.js</strong></td><td>Runs JavaScript <em>outside</em> the browser — this is what runs your server.</td><td>The engine of a car.</td></tr>
+    <tr><td><strong>npm</strong></td><td>Comes with Node. Downloads ready-made code (packages) like Express.</td><td>An app store for code.</td></tr>
+    <tr><td><strong>MySQL Server</strong></td><td>The database: it stores your data in tables.</td><td>A giant, very organised Excel file.</td></tr>
+    <tr><td><strong>MySQL Workbench</strong></td><td>A program to look inside your database and run SQL.</td><td>A window into the Excel file.</td></tr>
+    <tr><td><strong>Postman</strong></td><td>A program to send test requests to your server.</td><td>A fake customer that tests your shop.</td></tr>
+  </tbody>
+</table>
+
+<div class="callout note"><span class="label">You already have some of these?</span>
+<p>Great — skim those sections and do the <a href="#check">check</a> at the end anyway. It takes one minute and catches problems early.</p></div>
+
+<h2 id="vscode">1. Install VS Code</h2>
+<ol class="steps">
+  <li>Go to <strong>code.visualstudio.com</strong> and click the big <strong>Download for Windows</strong> button.</li>
+  <li>Open the downloaded file. Accept the agreement and click <strong>Next</strong>.</li>
+  <li>On the <strong>“Select Additional Tasks”</strong> screen, tick all of these:
+    <ul>
+      <li>Add “Open with Code” action to Windows Explorer file context menu</li>
+      <li>Add “Open with Code” action to Windows Explorer directory context menu</li>
+      <li>Add to PATH</li>
+    </ul>
+    These let you right-click a folder → <strong>Open with Code</strong>.</li>
+  <li>Click <strong>Install</strong>, then <strong>Finish</strong>.</li>
+</ol>
+
+<h2 id="tour">2. VS Code basics: folders, files, saving</h2>
+<p>In VS Code you always work inside a <strong>folder</strong> — one folder per project. All your project files live in that folder.</p>
+
+<h3>Open a project folder</h3>
+<ol class="steps">
+  <li>On your Desktop, make a new folder (right-click → New → Folder) and name it <code>my-backend</code>.</li>
+  <li>In VS Code: <strong>File → Open Folder…</strong> → choose <code>my-backend</code> → <strong>Select Folder</strong>.</li>
+  <li>If it asks “Do you trust the authors of the files in this folder?”, click <strong>Yes, I trust the authors</strong> (it's your own folder).</li>
+</ol>
+<p>On the left you now see the <strong>Explorer</strong> panel (if not, press <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>E</kbd>). At the top of it there's the folder name and four small icons when you hover over it:</p>
+<table>
+  <tbody>
+    <tr><td>📄+</td><td><strong>New File</strong> — click it, type a name like <code>hello.js</code>, press <kbd>Enter</kbd>.</td></tr>
+    <tr><td>📁+</td><td><strong>New Folder</strong> — for example <code>routes</code>.</td></tr>
+    <tr><td>⟳</td><td>Refresh</td></tr>
+    <tr><td>⊟</td><td>Collapse all folders</td></tr>
+  </tbody>
+</table>
+<div class="callout tip"><span class="label">Making a file inside a folder</span>
+<p>Click on the folder first (for example <code>routes</code>), <em>then</em> click New File. The new file is created inside the selected folder. You can also type a path directly: <code>routes/userRoutes.js</code> creates the folder and the file at once.</p></div>
+
+<h3>The file name ending matters</h3>
+<p>The part after the dot is the <strong>extension</strong>. It tells VS Code (and Node) what kind of file it is: <code>.js</code> = JavaScript, <code>.json</code> = JSON data, <code>.md</code> = notes. A file called <code>.env</code> (only an ending, no name) is normal — it's for secret settings, you'll see it later.</p>
+
+<h3>Saving</h3>
+<p>Press <kbd>Ctrl</kbd>+<kbd>S</kbd> to save. A <strong>white dot</strong> on the file's tab means “not saved yet”. Unsaved code does <em>not</em> run! Tip: turn on <strong>File → Auto Save</strong> so you never forget.</p>
+
+<h3>The terminal inside VS Code</h3>
+<p>Open it with <kbd>Ctrl</kbd>+<kbd>`</kbd> (the key under <kbd>Esc</kbd>) or <strong>Terminal → New Terminal</strong>. It opens at the bottom, already inside your project folder. You'll see something like:</p>
+<pre><code class="nohl">PS C:\Users\you\Desktop\my-backend&gt;</code></pre>
+<p>That's the <strong>prompt</strong>: the terminal is waiting for a command. Type a command and press <kbd>Enter</kbd>. Useful ones:</p>
+<table>
+  <thead><tr><th>Command</th><th>What it does</th></tr></thead>
+  <tbody>
+    <tr><td><code>dir</code> (or <code>ls</code>)</td><td>List the files in the current folder</td></tr>
+    <tr><td><code>cd routes</code></td><td>Go into the folder <code>routes</code></td></tr>
+    <tr><td><code>cd ..</code></td><td>Go back up one folder</td></tr>
+    <tr><td><code>mkdir controllers</code></td><td>Make a new folder</td></tr>
+    <tr><td><code>cls</code> (or <code>clear</code>)</td><td>Clear the screen</td></tr>
+    <tr><td><kbd>↑</kbd> arrow</td><td>Bring back the last command (saves typing!)</td></tr>
+    <tr><td><kbd>Ctrl</kbd>+<kbd>C</kbd></td><td><strong>Stop</strong> the running program (for example, your server)</td></tr>
+  </tbody>
+</table>
+
+<div class="exercise">
+  <span class="ex-tag">Quiz</span>
+  <div class="quiz">
+    <p class="q">You made changes to your code, but nothing is different when you run it. There is a white dot on the file tab. What's wrong?</p>
+    <div class="options">
+      <button data-why="Reinstalling won't help — the problem is the file itself.">Node.js is broken, reinstall it</button>
+      <button data-correct>The file is not saved — press Ctrl+S</button>
+      <button data-why="The terminal is fine. Look at the white dot.">The terminal needs to be closed</button>
+    </div>
+    <div class="explain">The white dot means “unsaved changes”. Node runs the file that is <em>saved on the disk</em>, not what you see in the editor.</div>
+  </div>
+</div>
+
+<h2 id="node">3. Install Node.js (with npm)</h2>
+<ol class="steps">
+  <li>Go to <strong>nodejs.org</strong>. Download the <strong>LTS</strong> version (LTS = “Long Term Support”, the stable one). Choose the <strong>Windows Installer (.msi)</strong>.</li>
+  <li>Run it. Click Next through the screens. Keep the default options (they include <strong>npm</strong> and <strong>Add to PATH</strong>).</li>
+  <li>The screen “Tools for Native Modules” — you can leave it <strong>unticked</strong>.</li>
+  <li>When finished, <strong>close VS Code completely and open it again</strong>. A terminal only knows about programs that were installed before it opened.</li>
+  <li>In a new terminal type these two commands:</li>
+</ol>
+<pre><code class="language-bash">node -v
+npm -v</code></pre>
+<p>You should see version numbers, like <code>v22.11.0</code> and <code>10.9.0</code>. Any numbers are fine.</p>
+
+<div class="callout warn"><span class="label">Error: “npm.ps1 cannot be loaded because running scripts is disabled”</span>
+<p>Very common on Windows. VS Code's terminal is <em>PowerShell</em>, which blocks some scripts by default. Two ways to fix it — choose one:</p>
+<ol>
+  <li><strong>Easiest:</strong> In the terminal panel, click the small <strong>⌄</strong> next to the <strong>+</strong> and choose <strong>Command Prompt</strong>. Use that terminal. (To make it the default: <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>P</kbd> → “Terminal: Select Default Profile” → Command Prompt.)</li>
+  <li>Or allow scripts for your own user only. Run this once in PowerShell:
+<pre><code class="language-bash">Set-ExecutionPolicy -Scope CurrentUser RemoteSigned</code></pre></li>
+</ol></div>
+<div class="callout warn"><span class="label">Error: “node is not recognized as an internal or external command”</span>
+<p>Either Node is not installed, or the terminal was opened before the install. Close <strong>all</strong> VS Code windows and open it again. If it still fails, restart your computer.</p></div>
+
+<h3>Your first JavaScript program</h3>
+<ol class="steps">
+  <li>In your <code>my-backend</code> folder, make a new file called <code>hello.js</code>.</li>
+  <li>Type this in it and save:
+<pre><code class="language-javascript">console.log("Hello from Node!");
+console.log(2 + 3);</code></pre></li>
+  <li>In the terminal run:
+<pre><code class="language-bash">node hello.js</code></pre></li>
+  <li>You should see <code>Hello from Node!</code> and <code>5</code>. 🎉 You just ran JavaScript outside a browser.</li>
+</ol>
+<p><code>node</code> + a file name = “Node, please run this file”. That is exactly how you will start your server later: <code>node server.js</code>.</p>
+
+<h2 id="npm">4. npm and packages</h2>
+<p>A <strong>package</strong> is code someone else wrote that you can use. Express (for building servers) is a package. npm downloads packages for you.</p>
+<p><strong>Every new project starts with:</strong></p>
+<pre><code class="language-bash">npm init -y</code></pre>
+<p>This creates <code>package.json</code> — your project's “ID card”: its name and the list of packages it needs. (<code>-y</code> means “yes to all questions”.)</p>
+<p>Then install packages:</p>
+<pre><code class="language-bash">npm install express</code></pre>
+<p>Three things happen:</p>
+<ul>
+  <li>A folder <code>node_modules</code> appears — the downloaded code. <strong>Never edit it, never upload it.</strong></li>
+  <li><code>package.json</code> gets a <code>"dependencies"</code> list with <code>"express"</code> in it.</li>
+  <li>A file <code>package-lock.json</code> appears — exact versions. Leave it alone.</li>
+</ul>
+<p>You can install several packages at once. For the full course project:</p>
+<pre><code class="language-bash">npm install express mysql2 dotenv bcrypt cookie-parser</code></pre>
+<div class="callout tip"><span class="label">Got someone else's project?</span>
+<p>It won't have <code>node_modules</code> (it's never shared). Just run <code>npm install</code> with no package name — npm reads <code>package.json</code> and downloads everything.</p></div>
+
+<div class="exercise">
+  <span class="ex-tag">Quiz</span>
+  <div class="quiz">
+    <p class="q">Which folder should you NEVER upload to GitHub or send to friends?</p>
+    <div class="options">
+      <button data-why="routes contains your own code — share it.">routes</button>
+      <button data-correct>node_modules</button>
+      <button data-why="package.json is needed so others can run npm install.">package.json</button>
+    </div>
+    <div class="explain"><code>node_modules</code> is huge and can be re-created any time with <code>npm install</code>. You'll put it in a file called <code>.gitignore</code> so Git skips it.</div>
+  </div>
+  <div class="quiz">
+    <p class="q">You start a brand new project folder. What is the first npm command?</p>
+    <div class="options">
+      <button data-correct>npm init -y</button>
+      <button data-why="That installs a package, but first you need a package.json.">npm install express</button>
+      <button data-why="node runs a JavaScript file; it doesn't set up a project.">node server.js</button>
+    </div>
+    <div class="explain"><code>npm init -y</code> creates <code>package.json</code>. After that you install packages.</div>
+  </div>
+</div>
+
+<h2 id="mysql">5. Install MySQL Server and Workbench</h2>
+<p>You need two things: the <strong>MySQL Server</strong> (the database, runs in the background) and <strong>MySQL Workbench</strong> (the window to look into it).</p>
+<ol class="steps">
+  <li>Go to <strong>dev.mysql.com/downloads/mysql</strong>. Choose <strong>Microsoft Windows</strong> and download the <strong>MSI Installer</strong>. (On the next page, click “No thanks, just start my download”.)</li>
+  <li>Run it with the default (Typical) setup. At the end, the <strong>MySQL Configurator</strong> opens.</li>
+  <li>In the Configurator: keep <strong>Development Computer</strong> and <strong>port 3306</strong>.</li>
+  <li>Set a <strong>root password</strong>. <strong>Write it down!</strong> You'll need it in Workbench and in your project's <code>.env</code> file.</li>
+  <li>Keep <strong>“Configure MySQL Server as a Windows Service”</strong> and <strong>“Start the MySQL Server at System Startup”</strong> ticked. Then MySQL is always running in the background.</li>
+  <li>Click through to <strong>Execute</strong> and <strong>Finish</strong>.</li>
+  <li>Now go to <strong>dev.mysql.com/downloads/workbench</strong> and install <strong>MySQL Workbench</strong> the same way.</li>
+</ol>
+<div class="callout note"><span class="label">Older guides</span><p>Older videos show one big “MySQL Installer” that installs everything together. Newer versions install the server and Workbench separately. Both ways work.</p></div>
+
+<h3>Create your database</h3>
+<ol class="steps">
+  <li>Open <strong>MySQL Workbench</strong>. Under “MySQL Connections” click <strong>Local instance MySQL…</strong> and enter your root password.</li>
+  <li>A query tab opens. Type:
+<pre><code class="language-sql">CREATE DATABASE travel_db;</code></pre></li>
+  <li>Click the <strong>⚡ lightning</strong> icon (or press <kbd>Ctrl</kbd>+<kbd>Enter</kbd>) to run it.</li>
+  <li>On the left, in the <strong>Schemas</strong> panel, click the refresh icon. You should see <code>travel_db</code>. (“Schema” is MySQL's word for “database”.)</li>
+</ol>
+<p>That's all for now — you'll create the tables from your Node code in Chapter 5.</p>
+<div class="callout warn"><span class="label">Error later: ECONNREFUSED 127.0.0.1:3306</span>
+<p>This means MySQL Server is not running. Press <kbd>Win</kbd>, type <strong>Services</strong>, open it, find <strong>MySQL</strong> (for example “MySQL84”), right-click → <strong>Start</strong>.</p></div>
+
+<h2 id="postman">6. Install Postman (to test your server)</h2>
+<p>A browser can only easily send <code>GET</code> requests (open a URL). To test <code>POST</code>, <code>PUT</code> and <code>DELETE</code>, you need a tool. We use <strong>Postman</strong>.</p>
+<ol class="steps">
+  <li>Go to <strong>postman.com/downloads</strong> and download the <strong>Windows</strong> app. Run the installer — it installs and opens by itself.</li>
+  <li>It asks you to sign in or create a free account. You can make one, or look for the small <strong>“Continue without an account”</strong> / <strong>“Skip”</strong> link (it moves around between versions).</li>
+  <li>To make a request: click <strong>New</strong> → <strong>HTTP</strong> (or the <strong>+</strong> next to the open tabs). You'll use it from Chapter 3.</li>
+</ol>
+<div class="callout tip"><span class="label">Keep your requests</span>
+<p>Make a <strong>Collection</strong> (left side → <strong>Collections</strong> → <strong>+</strong>), name it “Travel API”, and save each request into it (<kbd>Ctrl</kbd>+<kbd>S</kbd>). Then you can re-send all your tests with one click every time you change your code.</p></div>
+
+<h2 id="check">7. Final check</h2>
+<p>Tick these off. They're saved in your browser.</p>
+<ul class="checklist" data-id="setup">
+  <li>VS Code is installed and I can open a folder with <strong>File → Open Folder</strong></li>
+  <li>I can make a new file and a new folder in the Explorer</li>
+  <li>I can open the terminal with <kbd>Ctrl</kbd>+<kbd>`</kbd></li>
+  <li><code>node -v</code> prints a version number</li>
+  <li><code>npm -v</code> prints a version number (no “scripts disabled” error)</li>
+  <li><code>node hello.js</code> prints “Hello from Node!”</li>
+  <li>MySQL Workbench connects to my Local instance with my root password</li>
+  <li>The database <code>travel_db</code> exists</li>
+  <li>Postman is installed and I can open a new request</li>
+</ul>
+
+<div class="exercise">
+  <span class="ex-tag">Quiz</span>
+  <div class="quiz">
+    <p class="q">Your server is running in the terminal and you can't type new commands. How do you stop it?</p>
+    <div class="options">
+      <button data-why="That would close VS Code. There's a better way.">Close VS Code</button>
+      <button data-correct>Press Ctrl+C in the terminal</button>
+      <button data-why="Typing 'stop' does nothing — the server is busy listening, not reading commands.">Type stop and press Enter</button>
+    </div>
+    <div class="explain"><kbd>Ctrl</kbd>+<kbd>C</kbd> stops the running program. A running server “takes over” the terminal. That's normal: it's waiting for requests.</div>
+  </div>
+</div>
+</main>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/javascript/javascript.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/sql/sql.min.js"></script>
+<script src="assets/app.js"></script>
+</body>
+</html>

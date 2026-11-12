@@ -1,0 +1,644 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>JOINs and Cookies · Backend from Zero</title>
+<meta name="description" content="Foreign keys, INNER JOIN, LEFT JOIN, self joins, and remembering things with cookies.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=JetBrains+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.css">
+<link rel="stylesheet" href="assets/style.css">
+<script>try{var t=localStorage.getItem('bfz-theme');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body data-page="08-joins-cookies.html">
+<main>
+<div class="kicker">Chapter 8 · course weeks 7–8</div>
+<h1>JOINs &amp; cookies</h1>
+<p class="lead">Real data is connected: users write reviews <em>about</em> trips. This chapter shows how tables point at each other, how to read them together with JOIN, and how cookies let the server remember small things.</p>
+
+<h2 id="relations">Tables that point at each other</h2>
+<p>A review needs to say <em>who</em> wrote it and <em>which trip</em> it's about. Instead of copying the username and destination into every review, the review stores their <strong>IDs</strong>. A column that holds another table's ID is a <strong>foreign key</strong>.</p>
+<div class="diagram" role="img" aria-label="REVIEWS has USER_ID pointing at USERS.ID and TRIP_ID pointing at TRIPS.ID. USERS.MANAGER_ID points at USERS.ID.">
+<svg viewBox="0 0 720 230" width="720" height="230">
+  <defs><marker id="ah8" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" class="muted"/></marker></defs>
+  <rect class="box-a" x="20" y="40" width="180" height="150" rx="10"/>
+  <text x="110" y="64" text-anchor="middle" font-weight="700">USERS</text>
+  <text x="36" y="92" class="mono small">ID  (primary key)</text>
+  <text x="36" y="112" class="mono small">USERNAME</text>
+  <text x="36" y="132" class="mono small">EMAIL, PASSWORD</text>
+  <text x="36" y="152" class="mono small">ROLE</text>
+  <text x="36" y="172" class="mono small">MANAGER_ID  → USERS</text>
+  <rect class="box-w" x="270" y="40" width="180" height="150" rx="10"/>
+  <text x="360" y="64" text-anchor="middle" font-weight="700">REVIEWS</text>
+  <text x="286" y="92" class="mono small">ID</text>
+  <text x="286" y="112" class="mono small">USER_ID  → USERS</text>
+  <text x="286" y="132" class="mono small">TRIP_ID  → TRIPS</text>
+  <text x="286" y="152" class="mono small">RATING  (1–5)</text>
+  <text x="286" y="172" class="mono small">UNIQUE(USER_ID, TRIP_ID)</text>
+  <rect class="box-g" x="520" y="40" width="180" height="150" rx="10"/>
+  <text x="610" y="64" text-anchor="middle" font-weight="700">TRIPS</text>
+  <text x="536" y="92" class="mono small">ID  (primary key)</text>
+  <text x="536" y="112" class="mono small">DESTINATION</text>
+  <text x="536" y="132" class="mono small">COUNTRY</text>
+  <text x="536" y="152" class="mono small">COST</text>
+  <line class="arrow" x1="282" y1="108" x2="204" y2="92" marker-end="url(#ah8)"/>
+  <line class="arrow" x1="440" y1="128" x2="516" y2="92" marker-end="url(#ah8)"/>
+  <path class="arrow" d="M 200 168 C 240 168, 240 215, 110 215 C 10 215, 0 100, 18 92" marker-end="url(#ah8)"/>
+  <text x="360" y="222" text-anchor="middle" class="muted small">arrows point from the foreign key to the row it refers to</text>
+</svg>
+</div>
+<div class="file-label">db.js — the REVIEWS table</div>
+<pre><code class="language-sql">CREATE TABLE IF NOT EXISTS REVIEWS (
+  ID INT AUTO_INCREMENT PRIMARY KEY,
+  USER_ID INT NOT NULL,
+  TRIP_ID INT NOT NULL,
+  RATING INT NOT NULL CHECK (RATING BETWEEN 1 AND 5),   -- only 1 to 5 allowed
+  FOREIGN KEY (USER_ID) REFERENCES USERS(ID),            -- must be a real user
+  FOREIGN KEY (TRIP_ID) REFERENCES TRIPS(ID),            -- must be a real trip
+  UNIQUE (USER_ID, TRIP_ID)                              -- one review per user per trip
+)</code></pre>
+<p>MySQL now <strong>protects</strong> your data:</p>
+<ul>
+  <li>A review for trip 999 (doesn't exist) → error <code>ER_NO_REFERENCED_ROW_2</code>.</li>
+  <li>Deleting a trip that has reviews → error <code>ER_ROW_IS_REFERENCED_2</code> (that's the 500 you saw in Practice 5.6).</li>
+  <li>The same user reviewing the same trip twice → <code>ER_DUP_ENTRY</code>.</li>
+  <li>Rating 7 → the CHECK fails.</li>
+</ul>
+<p>Since the tables point at each other, create them in the right order in <code>server.js</code>: USERS and TRIPS first, REVIEWS last.</p>
+<p>The practice data:</p>
+<div class="row" style="align-items:flex-start; gap:16px">
+<table class="sql-table" style="width:auto"><thead><tr><th colspan="4">USERS</th></tr><tr><th>ID</th><th>USERNAME</th><th>ROLE</th><th>MANAGER_ID</th></tr></thead>
+<tbody><tr><td>1</td><td>sara</td><td>admin</td><td class="null">NULL</td></tr><tr><td>2</td><td>omar</td><td>user</td><td>1</td></tr><tr><td>3</td><td>lina</td><td>user</td><td>1</td></tr><tr><td>4</td><td>youssef</td><td>user</td><td>2</td></tr></tbody></table>
+<table class="sql-table" style="width:auto"><thead><tr><th colspan="4">REVIEWS</th></tr><tr><th>ID</th><th>USER_ID</th><th>TRIP_ID</th><th>RATING</th></tr></thead>
+<tbody><tr><td>1</td><td>2</td><td>1</td><td>5</td></tr><tr><td>2</td><td>3</td><td>1</td><td>4</td></tr><tr><td>3</td><td>2</td><td>2</td><td>3</td></tr><tr><td>4</td><td>4</td><td>3</td><td>5</td></tr><tr><td>5</td><td>3</td><td>4</td><td>4</td></tr></tbody></table>
+</div>
+<p>(TRIPS is the same as in Chapter 6: 1 Paris, 2 Rome, 3 Tokyo, 4 Cairo, 5 Venice, 6 Kyoto, 7 Barcelona.) Notice: trips 5, 6 and 7 have <strong>no reviews</strong>.</p>
+
+<h2 id="inner">INNER JOIN: only rows that match</h2>
+<p>Read REVIEWS alone and you see numbers: “user 2 gave trip 1 a 5”. A <strong>JOIN</strong> glues the matching rows from another table onto each row:</p>
+<pre><code class="language-sql">SELECT t.DESTINATION, r.RATING
+FROM TRIPS AS t
+INNER JOIN REVIEWS AS r ON t.ID = r.TRIP_ID;</code></pre>
+<ul>
+  <li><code>TRIPS AS t</code> gives the table a short nickname (an <strong>alias</strong>). Then <code>t.DESTINATION</code> means “DESTINATION from TRIPS”.</li>
+  <li><code>ON t.ID = r.TRIP_ID</code> is the <strong>matching rule</strong>: glue a review onto the trip whose ID equals the review's TRIP_ID.</li>
+  <li><strong>INNER</strong> = keep only trips that have at least one matching review. Venice, Kyoto and Barcelona disappear.</li>
+</ul>
+
+<div class="exercise">
+  <span class="ex-tag">Practice 8.1</span>
+  <p>Run the query above first. Then extend it with a <strong>second JOIN</strong> to USERS, so the result is <strong>DESTINATION, RATING, USERNAME</strong> — who rated what. (This is the course's <code>getTripReviews</code> query.)</p>
+  <div class="sqlbox" id="j-inner" data-solution="SELECT t.DESTINATION, r.RATING, u.USERNAME FROM TRIPS AS t INNER JOIN REVIEWS AS r ON t.ID = r.TRIP_ID INNER JOIN USERS AS u ON r.USER_ID = u.ID;">
+<textarea>
+SELECT t.DESTINATION, r.RATING
+FROM TRIPS AS t
+INNER JOIN REVIEWS AS r ON t.ID = r.TRIP_ID;
+</textarea>
+  </div>
+  <details class="hint"><summary>Hint</summary><div>Add a line <code>INNER JOIN USERS AS u ON r.USER_ID = u.ID</code> and add <code>u.USERNAME</code> to the SELECT.</div></details>
+</div>
+
+<h2 id="left">LEFT JOIN: keep everything from the left table</h2>
+<p>What if you want <strong>all</strong> trips, even ones nobody reviewed? Use <code>LEFT JOIN</code>: it keeps every row of the <em>left</em> table (the one after FROM). Where there's no match, the review columns are <code>NULL</code>.</p>
+<table>
+  <thead><tr><th></th><th>INNER JOIN</th><th>LEFT JOIN</th></tr></thead>
+  <tbody>
+    <tr><td>Trip with reviews</td><td>✓ one row per review</td><td>✓ one row per review</td></tr>
+    <tr><td>Trip without reviews</td><td>✗ not shown</td><td>✓ one row, RATING = NULL</td></tr>
+  </tbody>
+</table>
+
+<div class="exercise">
+  <span class="ex-tag">Practice 8.2</span>
+  <p>Show <strong>DESTINATION</strong> and <strong>RATING</strong> for <strong>all</strong> trips, including those without reviews (8 rows). This is the course's <code>allTripsWithRatings</code>.</p>
+  <div class="sqlbox" id="j-left" data-solution="SELECT t.DESTINATION, r.RATING FROM TRIPS AS t LEFT JOIN REVIEWS AS r ON t.ID = r.TRIP_ID;">
+<textarea>
+-- your query here
+</textarea>
+  </div>
+</div>
+
+<h2 id="self">Self join: a table that points at itself</h2>
+<p><code>USERS.MANAGER_ID</code> points at another row of USERS. To show “employee → manager”, join USERS with <strong>itself</strong>, using two different aliases:</p>
+<div class="exercise">
+  <span class="ex-tag">Practice 8.3</span>
+  <p>Show two columns: <strong>Employee</strong> (username) and <strong>Manager</strong> (the manager's username) for <strong>every</strong> user — sara has no manager, so her Manager is NULL. (This is the course's <code>getEmployeesAndManagers</code>.)</p>
+  <div class="sqlbox" id="j-self" data-solution="SELECT e.USERNAME AS Employee, m.USERNAME AS Manager FROM USERS AS e LEFT JOIN USERS AS m ON e.MANAGER_ID = m.ID;">
+<textarea>
+SELECT e.USERNAME AS Employee, m.USERNAME AS Manager
+FROM USERS AS e
+-- join USERS again, as m (the manager)...
+</textarea>
+  </div>
+  <details class="hint"><summary>Hint</summary><div>“every user, even without a manager” → which JOIN keeps everything from the left? The matching rule: the employee's MANAGER_ID equals the manager's ID.</div></details>
+</div>
+
+<div class="exercise">
+  <span class="ex-tag">Challenge 8.4</span>
+  <p>Show each trip's <strong>DESTINATION</strong> and its <strong>average rating</strong> — all 7 trips (no reviews → NULL). Combine LEFT JOIN with <code>AVG</code> and <code>GROUP BY</code> from Chapter 6.</p>
+  <div class="sqlbox" id="j-avg" data-solution="SELECT t.DESTINATION, AVG(r.RATING) AS AVG_RATING FROM TRIPS AS t LEFT JOIN REVIEWS AS r ON t.ID = r.TRIP_ID GROUP BY t.ID, t.DESTINATION;">
+<textarea>
+-- your query here
+</textarea>
+  </div>
+  <details class="hint"><summary>Hint</summary><div>Start from Practice 8.2, change <code>r.RATING</code> to <code>AVG(r.RATING)</code> and add <code>GROUP BY t.ID, t.DESTINATION</code> at the end.</div></details>
+</div>
+
+<h2 id="api">Using JOINs in your API</h2>
+<p>In a controller, a JOIN is just a longer SQL string. Use backticks so it can span several lines:</p>
+<pre><code class="language-javascript">const getTripReviews = async (req, res) =&gt; {
+  try {
+    const query = `SELECT t.DESTINATION, r.RATING, u.USERNAME
+      FROM TRIPS AS t
+      INNER JOIN REVIEWS AS r ON t.ID = r.TRIP_ID
+      INNER JOIN USERS AS u ON r.USER_ID = u.ID`;
+    const [rows] = await db.query(query);
+    return res.status(200).json({ data: rows });
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({ message: 'Database error' });
+  }
+};</code></pre>
+<p>(Backticks are fine here because nothing from the user is inside. The moment you add a user value, use <code>?</code>.)</p>
+
+<div class="exercise">
+  <span class="ex-tag">Practice 8.5</span>
+  <h4>Reviews endpoints — and the course's route-order bug</h4>
+  <p>Write the two controllers, then press Run and try <code>GET /trips/reviews</code>. It won't work even when your controller is right… you know why from Chapter 4. Fix the routes file too.</p>
+  <div class="runner" id="ex-joinapi" data-express data-db data-entry="server.js">
+<textarea data-file="controllers/tripController.js" data-todo>
+const { db } = require('../db');
+
+const retrieveTripById = async (req, res) => {
+  const id = Number(req.params.id);
+  if (!Number.isSafeInteger(id) || id <= 0) {
+    return res.status(400).json({ message: 'Invalid trip ID' });
+  }
+  try {
+    const [trips] = await db.query('SELECT * FROM TRIPS WHERE ID = ?', [id]);
+    if (trips.length === 0) return res.status(404).json({ message: 'Trip not found' });
+    return res.status(200).json({ data: trips[0] });
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({ message: 'Database error' });
+  }
+};
+
+// TODO 1: getTripReviews → 200 { data: rows }  (INNER JOIN: DESTINATION, RATING, USERNAME)
+
+
+// TODO 2: allTripsWithRatings → 200 { data: rows }  (LEFT JOIN: DESTINATION, RATING)
+
+
+module.exports = { retrieveTripById, getTripReviews, allTripsWithRatings };
+</textarea>
+<textarea data-file="routes/tripRoutes.js" data-todo>
+const express = require('express');
+const {
+  retrieveTripById,
+  getTripReviews,
+  allTripsWithRatings
+} = require('../controllers/tripController');
+
+const tripRouter = express.Router();
+
+tripRouter.get('/:id', retrieveTripById);
+tripRouter.get('/reviews', getTripReviews);
+tripRouter.get('/ratings', allTripsWithRatings);
+
+module.exports = tripRouter;
+</textarea>
+<textarea data-file="db.js" data-readonly>
+const mysql = require('mysql2/promise');
+const dotenv = require('dotenv');
+dotenv.config();
+
+const db = mysql.createPool({
+  host: 'localhost',
+  port: 3306,
+  user: process.env.DB_USER,
+  password: process.env.DB_PASSWORD,
+  database: process.env.DB_NAME
+});
+
+module.exports = { db };
+</textarea>
+<textarea data-file="server.js" data-readonly>
+const express = require('express');
+const tripRouter = require('./routes/tripRoutes');
+
+const app = express();
+app.use(express.json());
+app.use('/trips', tripRouter);
+
+app.listen(5000, () => console.log('Server is running on port 5000'));
+</textarea>
+<script type="text/plain" class="tests">
+_test('GET /trips/reviews → 200 with 5 rows', async () => { const r = await _req('GET', '/trips/reviews'); _eq(r.status, 200, 'status'); return _eq((r.body.data || []).length, 5, 'number of rows'); });
+_test('each review row has DESTINATION, RATING and USERNAME', async () => _eq(Object.keys(((await _req('GET', '/trips/reviews')).body.data || [])[0] || {}).sort(), ['DESTINATION', 'RATING', 'USERNAME'], 'keys of a row'));
+_test('GET /trips/ratings → 200 with 8 rows (includes trips without reviews)', async () => _eq(((await _req('GET', '/trips/ratings')).body.data || []).length, 8, 'number of rows'));
+_test('GET /trips/2 still works', async () => _eq(((await _req('GET', '/trips/2')).body.data || {}).DESTINATION, 'Rome', 'data.DESTINATION'));
+</script>
+<script type="text/plain" class="tries">
+GET /trips/reviews
+GET /trips/ratings
+GET /trips/2
+</script>
+<script type="text/plain" class="solution" data-file="controllers/tripController.js">
+const { db } = require('../db');
+
+const retrieveTripById = async (req, res) => {
+  const id = Number(req.params.id);
+  if (!Number.isSafeInteger(id) || id <= 0) {
+    return res.status(400).json({ message: 'Invalid trip ID' });
+  }
+  try {
+    const [trips] = await db.query('SELECT * FROM TRIPS WHERE ID = ?', [id]);
+    if (trips.length === 0) return res.status(404).json({ message: 'Trip not found' });
+    return res.status(200).json({ data: trips[0] });
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({ message: 'Database error' });
+  }
+};
+
+const getTripReviews = async (req, res) => {
+  try {
+    const query = `SELECT t.DESTINATION, r.RATING, u.USERNAME
+      FROM TRIPS AS t
+      INNER JOIN REVIEWS AS r ON t.ID = r.TRIP_ID
+      INNER JOIN USERS AS u ON r.USER_ID = u.ID`;
+    const [rows] = await db.query(query);
+    return res.status(200).json({ data: rows });
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({ message: 'Database error' });
+  }
+};
+
+const allTripsWithRatings = async (req, res) => {
+  try {
+    const query = `SELECT t.DESTINATION, r.RATING
+      FROM TRIPS AS t
+      LEFT JOIN REVIEWS AS r ON t.ID = r.TRIP_ID`;
+    const [rows] = await db.query(query);
+    return res.status(200).json({ data: rows });
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({ message: 'Database error' });
+  }
+};
+
+module.exports = { retrieveTripById, getTripReviews, allTripsWithRatings };
+</script>
+<script type="text/plain" class="solution" data-file="routes/tripRoutes.js">
+const express = require('express');
+const {
+  retrieveTripById,
+  getTripReviews,
+  allTripsWithRatings
+} = require('../controllers/tripController');
+
+const tripRouter = express.Router();
+
+tripRouter.get('/reviews', getTripReviews);       // fixed paths first
+tripRouter.get('/ratings', allTripsWithRatings);
+tripRouter.get('/:id', retrieveTripById);         // /:id last
+
+module.exports = tripRouter;
+</script>
+  </div>
+</div>
+
+<div class="exercise">
+  <span class="ex-tag">Challenge 8.6</span>
+  <h4>POST /trips/:id/reviews — let users add a review</h4>
+  <p>The course doesn't build this one, but projects almost always need “add a row to the linking table”. Let MySQL's protections do the hard work, and translate its error codes into good status codes.</p>
+  <div class="runner" id="ex-addreview" data-express data-db data-entry="server.js">
+<textarea data-file="controllers/reviewController.js" data-todo>
+const { db } = require('../db');
+
+// TODO: addReview  (POST /trips/:id/reviews, body: { "userId": 1, "rating": 4 })
+// 1. tripId = Number(req.params.id), userId and rating from req.body
+// 2. tripId or userId not a positive whole number → 400 { message: 'Invalid trip or user ID' }
+// 3. rating not a whole number from 1 to 5 → 400 { message: 'Rating must be a whole number from 1 to 5' }
+//    (Number.isInteger(rating) && rating >= 1 && rating <= 5)
+// 4. INSERT INTO REVIEWS (USER_ID, TRIP_ID, RATING) VALUES (?, ?, ?)
+//    → 201 { message: 'Review added', data: { id: result.insertId, userId, tripId, rating } }
+// 5. catch:
+//    error.code === 'ER_DUP_ENTRY'            → 409 { message: 'You already reviewed this trip' }
+//    error.code === 'ER_NO_REFERENCED_ROW_2'  → 404 { message: 'User or trip not found' }
+//    otherwise                                → 500 { message: 'Database error' }
+
+
+module.exports = { addReview };
+</textarea>
+<textarea data-file="db.js" data-readonly>
+const mysql = require('mysql2/promise');
+const dotenv = require('dotenv');
+dotenv.config();
+
+const db = mysql.createPool({
+  host: 'localhost',
+  port: 3306,
+  user: process.env.DB_USER,
+  password: process.env.DB_PASSWORD,
+  database: process.env.DB_NAME
+});
+
+module.exports = { db };
+</textarea>
+<textarea data-file="server.js" data-readonly>
+const express = require('express');
+const { addReview } = require('./controllers/reviewController');
+
+const app = express();
+app.use(express.json());
+app.post('/trips/:id/reviews', addReview);
+
+app.listen(5000, () => console.log('Server is running on port 5000'));
+</textarea>
+<script type="text/plain" class="tests">
+_test('user 1 reviews trip 2 → 201', async () => { const r = await _req('POST', '/trips/2/reviews', { userId: 1, rating: 4 }); _eq(r.status, 201, 'status'); return _eq(r.body.data, { id: 6, userId: 1, tripId: 2, rating: 4 }, 'data'); });
+_test('rating 6 → 400', async () => _eq((await _req('POST', '/trips/2/reviews', { userId: 4, rating: 6 })).status, 400, 'status'));
+_test('rating "5" (text) → 400', async () => _eq((await _req('POST', '/trips/2/reviews', { userId: 4, rating: '5' })).status, 400, 'status'));
+_test('user 2 reviews trip 1 again → 409', async () => _eq((await _req('POST', '/trips/1/reviews', { userId: 2, rating: 1 })).status, 409, 'status'));
+_test('trip 999 → 404', async () => _eq((await _req('POST', '/trips/999/reviews', { userId: 1, rating: 3 })).status, 404, 'status'));
+</script>
+<script type="text/plain" class="tries">
+POST /trips/2/reviews {"userId": 1, "rating": 4}
+POST /trips/1/reviews {"userId": 2, "rating": 1}
+POST /trips/999/reviews {"userId": 1, "rating": 3}
+POST /trips/2/reviews {"userId": 1, "rating": 9}
+</script>
+<script type="text/plain" class="solution" data-file="controllers/reviewController.js">
+const { db } = require('../db');
+
+const addReview = async (req, res) => {
+  const tripId = Number(req.params.id);
+  const { userId, rating } = req.body;
+
+  if (!Number.isSafeInteger(tripId) || tripId <= 0 || !Number.isSafeInteger(userId) || userId <= 0) {
+    return res.status(400).json({ message: 'Invalid trip or user ID' });
+  }
+
+  if (!Number.isInteger(rating) || rating < 1 || rating > 5) {
+    return res.status(400).json({ message: 'Rating must be a whole number from 1 to 5' });
+  }
+
+  try {
+    const [result] = await db.query(
+      'INSERT INTO REVIEWS (USER_ID, TRIP_ID, RATING) VALUES (?, ?, ?)',
+      [userId, tripId, rating]
+    );
+
+    return res.status(201).json({
+      message: 'Review added',
+      data: { id: result.insertId, userId, tripId, rating }
+    });
+  } catch (error) {
+    if (error.code === 'ER_DUP_ENTRY') {
+      return res.status(409).json({ message: 'You already reviewed this trip' });
+    }
+    if (error.code === 'ER_NO_REFERENCED_ROW_2') {
+      return res.status(404).json({ message: 'User or trip not found' });
+    }
+    console.error(error);
+    return res.status(500).json({ message: 'Database error' });
+  }
+};
+
+module.exports = { addReview };
+</script>
+  </div>
+</div>
+
+<h2 id="cookies">Cookies: the server's sticky notes</h2>
+<div class="callout analogy"><span class="label">A cloakroom ticket</span>
+<p>When you leave your coat, you get a small ticket. Next time you come to the desk, you show the ticket and they know which coat is yours. A <strong>cookie</strong> is that ticket: a small piece of text the server gives the browser, which the browser <strong>automatically sends back</strong> with every next request to the same server.</p></div>
+<p>The course uses a cookie to remember the <strong>last trip you looked at</strong>:</p>
+<ol>
+  <li>You request <code>GET /trips/3</code>. The server answers with the trip <em>and</em> sets a cookie <code>lastViewedTrip=3</code>.</li>
+  <li>Later you request <code>GET /trips/last-viewed</code>. The browser sends the cookie along. The server reads it and returns trip 3.</li>
+</ol>
+<pre><code class="language-bash">npm install cookie-parser</code></pre>
+<div class="file-label">index.js</div>
+<pre><code class="language-javascript">const cookieParser = require('cookie-parser');
+app.use(cookieParser());   // without this, req.cookies is undefined!</code></pre>
+<div class="file-label">Setting and reading</div>
+<pre><code class="language-javascript">// set (before res.json!)
+res.cookie('lastViewedTrip', String(id), {
+  maxAge: 24 * 60 * 60 * 1000,  // how long it lives, in MILLISECONDS → 1 day
+  httpOnly: true,               // JavaScript in the web page can't read it (protects against theft)
+  secure: true,                 // only sent over HTTPS
+  sameSite: 'lax'               // not sent with requests from other websites
+});
+
+// read (in another request)
+const id = Number(req.cookies.lastViewedTrip);</code></pre>
+<div class="callout warn"><span class="label">Two gotchas</span>
+<ul>
+  <li><strong>Cookies are always text.</strong> That's why you <code>String(id)</code> when setting and <code>Number(...)</code> when reading.</li>
+  <li><strong><code>secure: true</code> on http://.</strong> Browsers allow secure cookies on <code>localhost</code>, but some tools may not send them back over plain http. If your cookie doesn't come back while testing, try the request in the browser, or use <code>secure: false</code> while developing.</li>
+</ul></div>
+
+<div class="exercise">
+  <span class="ex-tag">Practice 8.7</span>
+  <div class="quiz">
+    <p class="q">The course code says <code>maxAge: 24 * 60 * 60 * 1000</code> with the comment “1 hour”. How long does the cookie really live?</p>
+    <div class="options">
+      <button data-why="1 hour would be 60 * 60 * 1000.">1 hour</button>
+      <button data-correct>1 day</button>
+      <button data-why="maxAge is in milliseconds, not seconds.">24 seconds</button>
+    </div>
+    <div class="explain">1000 ms × 60 = 1 minute, × 60 = 1 hour, × 24 = <strong>1 day</strong>. The comment is wrong — comments can lie, code doesn't!</div>
+  </div>
+</div>
+
+<div class="exercise">
+  <span class="ex-tag">Practice 8.8</span>
+  <h4>Last viewed trip</h4>
+  <p>Three files to fix. The simulator keeps cookies between your requests, like a browser does (they reset when you press Run).</p>
+  <div class="runner" id="ex-cookies" data-express data-db data-entry="server.js">
+<textarea data-file="controllers/tripController.js" data-todo>
+const { db } = require('../db');
+
+const retrieveTripById = async (req, res) => {
+  const id = Number(req.params.id);
+  if (!Number.isSafeInteger(id) || id <= 0) {
+    return res.status(400).json({ message: 'Invalid trip ID' });
+  }
+  try {
+    const [trips] = await db.query('SELECT * FROM TRIPS WHERE ID = ?', [id]);
+    if (trips.length === 0) return res.status(404).json({ message: 'Trip not found' });
+
+    // TODO 1: set the cookie lastViewedTrip = String(id)
+    //         options: maxAge 1 day, httpOnly true, secure true, sameSite 'lax'
+
+
+    return res.status(200).json({ data: trips[0] });
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({ message: 'Database error' });
+  }
+};
+
+// TODO 2: getLastViewedTrip
+// - id = Number(req.cookies.lastViewedTrip)
+// - invalid (no cookie → NaN) → 400 { message: 'No valid last viewed trip' }
+// - SELECT the trip → 404 if gone, else 200 { data: trips[0] }
+
+
+module.exports = { retrieveTripById, getLastViewedTrip };
+</textarea>
+<textarea data-file="routes/tripRoutes.js" data-todo>
+const express = require('express');
+const { retrieveTripById, getLastViewedTrip } = require('../controllers/tripController');
+
+const tripRouter = express.Router();
+
+// TODO 3: add GET '/last-viewed' → getLastViewedTrip  (where should it go?)
+tripRouter.get('/:id', retrieveTripById);
+
+module.exports = tripRouter;
+</textarea>
+<textarea data-file="index.js" data-todo>
+const express = require('express');
+const tripRouter = require('./routes/tripRoutes');
+// TODO 4: require cookie-parser
+
+const app = express();
+app.use(express.json());
+// TODO 5: use cookieParser()
+
+app.use('/trips', tripRouter);
+
+module.exports = { app };
+</textarea>
+<textarea data-file="db.js" data-readonly>
+const mysql = require('mysql2/promise');
+const dotenv = require('dotenv');
+dotenv.config();
+
+const db = mysql.createPool({
+  host: 'localhost',
+  port: 3306,
+  user: process.env.DB_USER,
+  password: process.env.DB_PASSWORD,
+  database: process.env.DB_NAME
+});
+
+module.exports = { db };
+</textarea>
+<textarea data-file="server.js" data-readonly>
+const { app } = require('./index.js');
+
+app.listen(5000, () => console.log('Server is running on port 5000'));
+</textarea>
+<script type="text/plain" class="tests">
+_test('without a cookie, GET /trips/last-viewed → 400', async () => _eq((await _req('GET', '/trips/last-viewed')).status, 400, 'status'));
+_test('GET /trips/3 sets the cookie lastViewedTrip=3 (httpOnly)', async () => { const r = await _req('GET', '/trips/3'); const c = r.cookies.find(c => c.name === 'lastViewedTrip'); if (!c) return 'no cookie called lastViewedTrip was set'; _eq(c.value, '3', 'cookie value'); return _eq(!!c.opts.httpOnly, true, 'httpOnly'); });
+_test('the cookie lives 1 day', async () => { const r = await _req('GET', '/trips/3'); const c = r.cookies.find(c => c.name === 'lastViewedTrip') || { opts: {} }; return _eq(c.opts.maxAge, 86400000, 'maxAge'); });
+_test('then GET /trips/last-viewed → Tokyo (trip 3)', async () => { const r = await _req('GET', '/trips/last-viewed'); _eq(r.status, 200, 'status'); return _eq(r.body.data && r.body.data.DESTINATION, 'Tokyo', 'data.DESTINATION'); });
+</script>
+<script type="text/plain" class="tries">
+GET /trips/last-viewed
+GET /trips/3
+GET /trips/last-viewed
+GET /trips/5
+</script>
+<script type="text/plain" class="solution" data-file="controllers/tripController.js">
+const { db } = require('../db');
+
+const retrieveTripById = async (req, res) => {
+  const id = Number(req.params.id);
+  if (!Number.isSafeInteger(id) || id <= 0) {
+    return res.status(400).json({ message: 'Invalid trip ID' });
+  }
+  try {
+    const [trips] = await db.query('SELECT * FROM TRIPS WHERE ID = ?', [id]);
+    if (trips.length === 0) return res.status(404).json({ message: 'Trip not found' });
+
+    res.cookie('lastViewedTrip', String(id), {
+      maxAge: 24 * 60 * 60 * 1000, // 1 day
+      httpOnly: true,
+      secure: true,
+      sameSite: 'lax'
+    });
+
+    return res.status(200).json({ data: trips[0] });
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({ message: 'Database error' });
+  }
+};
+
+const getLastViewedTrip = async (req, res) => {
+  const id = Number(req.cookies.lastViewedTrip);
+
+  if (!Number.isSafeInteger(id) || id <= 0) {
+    return res.status(400).json({ message: 'No valid last viewed trip' });
+  }
+
+  try {
+    const [trips] = await db.query('SELECT * FROM TRIPS WHERE ID = ?', [id]);
+    if (trips.length === 0) return res.status(404).json({ message: 'Trip not found' });
+    return res.status(200).json({ data: trips[0] });
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({ message: 'Database error' });
+  }
+};
+
+module.exports = { retrieveTripById, getLastViewedTrip };
+</script>
+<script type="text/plain" class="solution" data-file="routes/tripRoutes.js">
+const express = require('express');
+const { retrieveTripById, getLastViewedTrip } = require('../controllers/tripController');
+
+const tripRouter = express.Router();
+
+tripRouter.get('/last-viewed', getLastViewedTrip);  // ABOVE /:id
+tripRouter.get('/:id', retrieveTripById);
+
+module.exports = tripRouter;
+</script>
+<script type="text/plain" class="solution" data-file="index.js">
+const express = require('express');
+const tripRouter = require('./routes/tripRoutes');
+const cookieParser = require('cookie-parser');
+
+const app = express();
+app.use(express.json());
+app.use(cookieParser());
+
+app.use('/trips', tripRouter);
+
+module.exports = { app };
+</script>
+  </div>
+  <details class="hint"><summary>Hint 1 — “Cannot read properties of undefined (reading 'lastViewedTrip')”</summary><div><code>req.cookies</code> is undefined → cookie-parser isn't used in index.js.</div></details>
+  <details class="hint"><summary>Hint 2 — /last-viewed says “Invalid trip ID”</summary><div>That message comes from <code>retrieveTripById</code> — so <code>/:id</code> caught the request with id = "last-viewed". Route order!</div></details>
+</div>
+
+<div class="exercise">
+  <span class="ex-tag pc">On your computer</span>
+  <ul class="checklist" data-id="ch8">
+    <li>Added the REVIEWS table to <code>db.js</code> and created it in <code>server.js</code> <strong>after</strong> USERS and TRIPS</li>
+    <li>Added a few reviews in Workbench (with real USER_IDs and TRIP_IDs)</li>
+    <li>Ran the INNER JOIN and LEFT JOIN queries in Workbench and understood the difference</li>
+    <li>Added <code>GET /trips/reviews</code> and <code>GET /trips/ratings</code> (above <code>/:id</code>!)</li>
+    <li>Added <code>GET /users/managers</code> with the self join (above <code>/:id</code>!)</li>
+    <li>Installed and used <code>cookie-parser</code>; <code>GET /trips/last-viewed</code> works after viewing a trip</li>
+  </ul>
+</div>
+</main>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/javascript/javascript.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/sql/sql.min.js"></script>
+<script src="assets/app.js"></script>
+</body>
+</html>

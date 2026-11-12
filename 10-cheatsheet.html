@@ -1,0 +1,192 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Cheat Sheet and Errors · Backend from Zero</title>
+<meta name="description" content="Copy-ready Express, MySQL and SQL patterns, and what common error messages mean.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=JetBrains+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.css">
+<link rel="stylesheet" href="assets/style.css">
+<script>try{var t=localStorage.getItem('bfz-theme');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body data-page="10-cheatsheet.html">
+<main>
+<div class="kicker">Reference</div>
+<h1>Cheat sheet &amp; error messages</h1>
+<p class="lead">Everything on one page. Use it while building — but understand each line first (that's what chapters 1–8 are for).</p>
+
+<h2 id="terminal">Terminal</h2>
+<table>
+  <tbody>
+    <tr><td><code>npm init -y</code></td><td>Start a project (creates package.json)</td></tr>
+    <tr><td><code>npm install express mysql2 dotenv bcrypt cookie-parser</code></td><td>Install the course packages</td></tr>
+    <tr><td><code>npm install</code></td><td>Install everything listed in package.json</td></tr>
+    <tr><td><code>node server.js</code></td><td>Run the server</td></tr>
+    <tr><td><code>node --watch server.js</code></td><td>Run and restart on every save</td></tr>
+    <tr><td><kbd>Ctrl</kbd>+<kbd>C</kbd></td><td>Stop the server</td></tr>
+  </tbody>
+</table>
+
+<h2 id="skeleton">Project skeleton</h2>
+<div class="file-label">index.js</div>
+<pre><code class="language-javascript">const express = require('express');
+const cookieParser = require('cookie-parser');
+const userRouter = require('./routes/userRoutes');
+
+const app = express();
+app.use(express.json());
+app.use(cookieParser());
+
+app.use('/users', userRouter);
+
+module.exports = { app };</code></pre>
+<div class="file-label">server.js</div>
+<pre><code class="language-javascript">const { app } = require('./index.js');
+const { db, createUserTable } = require('./db.js');
+const dotenv = require('dotenv');
+dotenv.config();
+
+async function startServer() {
+  try {
+    await db.query(createUserTable);
+    app.listen(process.env.PORT, process.env.HOSTNAME, () =&gt; {
+      console.log(`Server is running at http://${process.env.HOSTNAME}:${process.env.PORT}`);
+    });
+  } catch (error) {
+    console.error('Error initializing the database:', error);
+    process.exitCode = 1;
+    await db.end();
+  }
+}
+
+startServer();</code></pre>
+<div class="file-label">db.js</div>
+<pre><code class="language-javascript">const mysql = require('mysql2/promise');
+const dotenv = require('dotenv');
+dotenv.config();
+
+const db = mysql.createPool({
+  host: 'localhost',
+  port: 3306,
+  user: process.env.DB_USER,
+  password: process.env.DB_PASSWORD,
+  database: process.env.DB_NAME
+});
+
+const createUserTable = `CREATE TABLE IF NOT EXISTS USERS ( ... )`;
+
+module.exports = { db, createUserTable };</code></pre>
+<div class="file-label">routes/thingRoutes.js</div>
+<pre><code class="language-javascript">const express = require('express');
+const { getAll, getOne, createOne, updateOne, deleteOne } = require('../controllers/thingController');
+
+const router = express.Router();
+router.get('/', getAll);
+router.post('/', createOne);
+// fixed paths like '/special' go HERE, above '/:id'
+router.get('/:id', getOne);
+router.put('/:id', updateOne);
+router.delete('/:id', deleteOne);
+
+module.exports = router;</code></pre>
+
+<h2 id="controllers">Controller patterns</h2>
+<div class="file-label">Get one (validate id → query → 404 → 200)</div>
+<pre><code class="language-javascript">const getOne = async (req, res) =&gt; {
+  const id = Number(req.params.id);
+  if (!Number.isSafeInteger(id) || id &lt;= 0) {
+    return res.status(400).json({ message: 'Invalid ID' });
+  }
+  try {
+    const [rows] = await db.query('SELECT * FROM THINGS WHERE ID = ?', [id]);
+    if (rows.length === 0) return res.status(404).json({ message: 'Not found' });
+    return res.status(200).json({ data: rows[0] });
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({ message: 'Database error' });
+  }
+};</code></pre>
+<div class="file-label">Create (validate body → insert → select new row → 201)</div>
+<pre><code class="language-javascript">const createOne = async (req, res) =&gt; {
+  const { name, price } = req.body;
+  if (!name || price === undefined) {
+    return res.status(400).json({ message: 'Please provide all required fields' });
+  }
+  try {
+    const [result] = await db.query('INSERT INTO THINGS (NAME, PRICE) VALUES (?, ?)', [name, price]);
+    const [rows] = await db.query('SELECT * FROM THINGS WHERE ID = ?', [result.insertId]);
+    return res.status(201).json({ message: 'Created', data: rows[0] });
+  } catch (error) {
+    if (error.code === 'ER_DUP_ENTRY') return res.status(409).json({ message: 'Already exists' });
+    console.error(error);
+    return res.status(500).json({ message: 'Database error' });
+  }
+};</code></pre>
+<div class="file-label">Partial update</div>
+<pre><code class="language-javascript">const [rows] = await db.query('SELECT * FROM THINGS WHERE ID = ?', [id]);
+if (rows.length === 0) return res.status(404).json({ message: 'Not found' });
+const newName = name || rows[0].NAME;
+await db.query('UPDATE THINGS SET NAME = ? WHERE ID = ?', [newName, id]);</code></pre>
+<div class="file-label">Delete</div>
+<pre><code class="language-javascript">const [result] = await db.query('DELETE FROM THINGS WHERE ID = ?', [id]);
+if (result.affectedRows === 0) return res.status(404).json({ message: 'Not found' });
+return res.status(200).json({ message: 'Deleted' });</code></pre>
+<div class="file-label">bcrypt &amp; cookies</div>
+<pre><code class="language-javascript">const hashed = await bcrypt.hash(password, 12);
+const ok = await bcrypt.compare(typedPassword, user.PASSWORD);
+
+res.cookie('name', String(value), { maxAge: 24 * 60 * 60 * 1000, httpOnly: true, secure: true, sameSite: 'lax' });
+const value = req.cookies.name;   // needs app.use(cookieParser())</code></pre>
+
+<h2 id="sql">SQL</h2>
+<pre><code class="language-sql">SELECT col1, col2 FROM T WHERE x = ? AND y &gt; ? ORDER BY col1 DESC LIMIT 10;
+INSERT INTO T (A, B) VALUES (?, ?);
+UPDATE T SET A = ?, B = ? WHERE ID = ?;
+DELETE FROM T WHERE ID = ?;
+SELECT COUNTRY, COUNT(*), AVG(COST) FROM TRIPS GROUP BY COUNTRY;
+
+SELECT a.X, b.Y FROM A AS a INNER JOIN B AS b ON a.ID = b.A_ID;   -- only matches
+SELECT a.X, b.Y FROM A AS a LEFT JOIN  B AS b ON a.ID = b.A_ID;   -- all of A, NULL if no match</code></pre>
+
+<h2 id="status">Status codes</h2>
+<p><code>200</code> OK · <code>201</code> Created · <code>400</code> bad/missing input · <code>401</code> wrong login · <code>403</code> not allowed · <code>404</code> not found · <code>409</code> already exists · <code>500</code> server/database error</p>
+
+<h2 id="errors">Error messages and what they mean</h2>
+<table>
+  <thead><tr><th>Error</th><th>Means</th><th>Fix</th></tr></thead>
+  <tbody>
+    <tr><td><code>Cannot find module 'express'</code></td><td>Package not installed</td><td><code>npm install express</code> (in the right folder!)</td></tr>
+    <tr><td><code>Cannot find module './routes/userRoute'</code></td><td>Wrong path or file name</td><td>Check spelling, <code>./</code> vs <code>../</code>, folder names</td></tr>
+    <tr><td><code>EADDRINUSE: address already in use :::5000</code></td><td>The server is already running somewhere</td><td>Stop the other one (<kbd>Ctrl</kbd>+<kbd>C</kbd> in the other terminal) or close extra terminals</td></tr>
+    <tr><td><code>Route.get() requires a callback function but got a [object Undefined]</code></td><td>The controller name you imported doesn't exist</td><td>Check the name in <code>module.exports</code> and in the <code>require</code></td></tr>
+    <tr><td><code>Cannot destructure property 'x' of 'req.body' as it is undefined</code></td><td>No body was parsed</td><td>Add <code>app.use(express.json())</code>; in Postman choose Body → raw → JSON</td></tr>
+    <tr><td><code>Cannot GET /something</code> (404)</td><td>No route matches that method + path</td><td>Check the method, the <code>app.use</code> prefix, the router path</td></tr>
+    <tr><td><code>Cannot set headers after they are sent to the client</code></td><td>You answered twice</td><td>Add <code>return</code> before early <code>res.status(...)</code></td></tr>
+    <tr><td><code>X is not defined</code></td><td>Using a variable/function that doesn't exist here</td><td>Did you <code>require</code> it? Spelling?</td></tr>
+    <tr><td><code>... is not iterable</code></td><td>Destructuring <code>[rows]</code> from something that's not an array</td><td>Missing <code>await</code> before <code>db.query</code></td></tr>
+    <tr><td><code>Cannot read properties of undefined (reading 'x')</code></td><td>Something before the dot is undefined</td><td>Print it with <code>console.log</code>; e.g. <code>req.cookies</code> needs cookie-parser</td></tr>
+    <tr><td><code>ER_ACCESS_DENIED_ERROR</code></td><td>Wrong DB user/password</td><td>Check <code>.env</code>; <code>dotenv.config()</code> before <code>createPool</code></td></tr>
+    <tr><td><code>ER_BAD_DB_ERROR: Unknown database</code></td><td>Database doesn't exist</td><td><code>CREATE DATABASE …;</code> in Workbench</td></tr>
+    <tr><td><code>ECONNREFUSED 127.0.0.1:3306</code></td><td>MySQL isn't running</td><td>Start the MySQL service</td></tr>
+    <tr><td><code>ER_NO_SUCH_TABLE</code></td><td>Table doesn't exist (or a typo like TRIP vs TRIPS)</td><td>Check the name; did startServer create it?</td></tr>
+    <tr><td><code>ER_BAD_FIELD_ERROR: Unknown column</code></td><td>Column name typo</td><td>Compare with your CREATE TABLE</td></tr>
+    <tr><td><code>ER_PARSE_ERROR</code> / “error in your SQL syntax”</td><td>SQL typo — or a user value with a <code>'</code> glued into the SQL</td><td>Read the part after “near”; use <code>?</code> placeholders</td></tr>
+    <tr><td><code>ER_DUP_ENTRY</code></td><td>A UNIQUE value already exists</td><td>Catch it and answer 409</td></tr>
+    <tr><td><code>ER_NO_REFERENCED_ROW_2</code></td><td>Foreign key points at a row that doesn't exist</td><td>Answer 404 / check the ids</td></tr>
+    <tr><td><code>ER_ROW_IS_REFERENCED_2</code></td><td>Deleting a row that others point at</td><td>Delete the children first (e.g. its reviews), or answer 409</td></tr>
+    <tr><td><code>npm.ps1 cannot be loaded … running scripts is disabled</code></td><td>PowerShell blocks npm</td><td>Use a Command Prompt terminal (see Chapter 0)</td></tr>
+    <tr><td>Response is the same after changing code</td><td>Server not restarted, or file not saved</td><td><kbd>Ctrl</kbd>+<kbd>S</kbd>, then restart (or use <code>--watch</code>)</td></tr>
+    <tr><td>Request loads forever</td><td>Your route never sent a response</td><td>Every path through the function must end in <code>res.json(...)</code></td></tr>
+  </tbody>
+</table>
+</main>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/javascript/javascript.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/sql/sql.min.js"></script>
+<script src="assets/app.js"></script>
+</body>
+</html>

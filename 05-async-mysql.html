@@ -1,0 +1,891 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Async and MySQL · Backend from Zero</title>
+<meta name="description" content="async/await, promises, connecting Express to MySQL with mysql2, and writing database controllers.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=JetBrains+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.css">
+<link rel="stylesheet" href="assets/style.css">
+<script>try{var t=localStorage.getItem('bfz-theme');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body data-page="05-async-mysql.html">
+<main>
+<div class="kicker">Chapter 5 · course weeks 5–6</div>
+<h1>Async &amp; MySQL: saving data for real</h1>
+<p class="lead">The array “database” forgets everything on restart. Now you connect to MySQL. But a database takes time to answer — so first you need to understand <code>async</code> and <code>await</code>.</p>
+
+<h2 id="async">Why “async”?</h2>
+<div class="callout analogy"><span class="label">Ordering food</span>
+<p>When you order food, you don't stand frozen at the door until it arrives. You get a <strong>promise</strong>: “your food will come”. Meanwhile you can do other things. When it arrives, you continue.</p>
+<p>Asking a database is the same. <code>db.query(...)</code> doesn't give you the rows immediately — it gives you a <strong>Promise</strong> of the rows. You use <code>await</code> to say “wait here until the promise is done, then give me the result”.</p></div>
+<pre><code class="language-javascript">async function getUsers() {              // 1. "async" before the function…
+  const [users] = await db.query('SELECT * FROM USERS');   // 2. …allows "await" inside it
+  console.log(users);                    // 3. this runs only AFTER the rows arrived
+}</code></pre>
+<p>Two rules:</p>
+<ol>
+  <li><code>await</code> only works inside a function marked <code>async</code>.</li>
+  <li>If you forget <code>await</code>, you get the promise itself (an empty “coupon”), not the data: <code>Promise { &lt;pending&gt; }</code>.</li>
+</ol>
+
+<div class="exercise">
+  <span class="ex-tag bug">Spot the bug 5.1</span>
+  <p>Run it and look at what gets printed. Then fix it with <strong>one word</strong>.</p>
+  <div class="runner" id="ex-await">
+<textarea data-file="main.js">
+// A fake "database" that takes a moment to answer, like a real one.
+function getTripsFromDb() {
+  return new Promise(resolve => {
+    setTimeout(() => resolve(['Paris', 'Rome', 'Tokyo']), 20);
+  });
+}
+
+async function showTrips() {
+  const trips = getTripsFromDb();   // something is missing on this line
+  console.log(trips);
+  console.log(`We have ${trips.length} trips`);
+}
+
+showTrips();
+</textarea>
+<script type="text/plain" class="tests">
+_test('it printed the 3 trips (not a Promise)', () => _logs.some(l => l.text.includes("'Paris'")) || 'Printed: ' + _logs.map(l => l.text).join(' / '));
+_test('it printed "We have 3 trips"', () => _logs.some(l => l.text === 'We have 3 trips') || 'Printed: ' + _logs.map(l => l.text).join(' / '));
+</script>
+<script type="text/plain" class="solution">
+function getTripsFromDb() {
+  return new Promise(resolve => {
+    setTimeout(() => resolve(['Paris', 'Rome', 'Tokyo']), 20);
+  });
+}
+
+async function showTrips() {
+  const trips = await getTripsFromDb();   // await = wait for the promise
+  console.log(trips);
+  console.log(`We have ${trips.length} trips`);
+}
+
+showTrips();
+</script>
+  </div>
+</div>
+
+<h3>Errors with await: try / catch</h3>
+<p>If the database fails (wrong password, MySQL turned off, a typo in SQL), the <code>await</code> line <strong>throws an error</strong>. Catch it, or your request breaks:</p>
+<pre><code class="language-javascript">const retrieveAllUsers = async (req, res) =&gt; {
+  try {
+    const [users] = await db.query('SELECT * FROM USERS');
+    return res.status(200).json({ status: 'success', results: users.length, data: users });
+  } catch (error) {
+    console.error(error);   // print the real reason in YOUR terminal (very useful!)
+    return res.status(500).json({ message: 'Database error' });  // a simple message for the client
+  }
+};</code></pre>
+
+<div class="exercise">
+  <span class="ex-tag">Practice 5.2</span>
+  <div class="runner" id="ex-trycatch-async">
+<textarea data-file="main.js">
+// Fake database: user 1 exists, anything else makes it fail.
+function getUserFromDb(id) {
+  return new Promise((resolve, reject) => {
+    setTimeout(() => {
+      if (id === 1) resolve({ id: 1, username: 'sara' });
+      else reject(new Error('Database connection lost'));
+    }, 10);
+  });
+}
+
+// TODO: write an ASYNC function loadUser(id) that:
+// - in a try block: awaits getUserFromDb(id) and returns the user
+// - in the catch block: returns the text "Error: " + the error's message
+
+
+</textarea>
+<script type="text/plain" class="tests">
+_test('loadUser is an async function (returns a Promise)', () => { const p = loadUser(1); return (p instanceof Promise) || 'loadUser(1) did not return a Promise — did you write async?'; });
+_test('await loadUser(1) gives { id: 1, username: "sara" }', async () => _eq(await loadUser(1), { id: 1, username: 'sara' }));
+_test('await loadUser(2) gives "Error: Database connection lost"', async () => _eq(await loadUser(2), 'Error: Database connection lost'));
+</script>
+<script type="text/plain" class="solution">
+function getUserFromDb(id) {
+  return new Promise((resolve, reject) => {
+    setTimeout(() => {
+      if (id === 1) resolve({ id: 1, username: 'sara' });
+      else reject(new Error('Database connection lost'));
+    }, 10);
+  });
+}
+
+async function loadUser(id) {
+  try {
+    const user = await getUserFromDb(id);
+    return user;
+  } catch (error) {
+    return "Error: " + error.message;
+  }
+}
+</script>
+  </div>
+</div>
+
+<h2 id="connect">Connecting to MySQL</h2>
+<p>Install two more packages in your project:</p>
+<pre><code class="language-bash">npm install mysql2 dotenv</code></pre>
+<ul>
+  <li><strong>mysql2</strong> — lets Node talk to MySQL.</li>
+  <li><strong>dotenv</strong> — reads secret settings (like your database password) from a file called <code>.env</code>.</li>
+</ul>
+
+<h3>The .env file: settings and secrets</h3>
+<p>Make a file called exactly <code>.env</code> in the main project folder (next to <code>server.js</code>):</p>
+<div class="file-label">.env</div>
+<pre><code class="language-ini">HOSTNAME=localhost
+PORT=5000
+
+DB_USER=root
+DB_PASSWORD=the_password_you_wrote_down
+DB_NAME=travel_db</code></pre>
+<p><code>dotenv.config()</code> reads this file and puts every line into <code>process.env</code>. So <code>process.env.DB_PASSWORD</code> becomes your password — without the password being written in your code.</p>
+<div class="callout danger"><span class="label">Never upload .env</span>
+<p>Make a file <code>.gitignore</code> with these two lines, so Git never uploads them:</p>
+<pre><code class="nohl">node_modules
+.env</code></pre>
+<p>To show teammates which settings are needed, make a copy called <code>.env.example</code> with fake values. That one you <em>do</em> upload.</p></div>
+
+<h3>db.js: the connection</h3>
+<div class="file-label">db.js</div>
+<pre><code class="language-javascript">const mysql = require('mysql2/promise');   // the /promise version works with await
+const dotenv = require('dotenv');
+dotenv.config();                           // load .env into process.env
+
+const db = mysql.createPool({
+  host: 'localhost',
+  port: 3306,                              // MySQL's default port
+  user: process.env.DB_USER,
+  password: process.env.DB_PASSWORD,
+  database: process.env.DB_NAME
+});
+
+const createTripTable = `CREATE TABLE IF NOT EXISTS TRIPS (
+  ID INT AUTO_INCREMENT PRIMARY KEY,
+  DESTINATION VARCHAR(150) NOT NULL,
+  COUNTRY VARCHAR(150) NOT NULL,
+  COST DECIMAL(10,2) NOT NULL
+)`;
+
+module.exports = { db, createTripTable };</code></pre>
+<p>A <strong>pool</strong> is a group of ready connections to the database, like a taxi rank: when your code needs to talk to MySQL, it takes a free “taxi” and gives it back afterwards. You don't need to manage it — just use <code>db.query(...)</code>.</p>
+<p>The <code>CREATE TABLE</code> text is SQL. You'll learn it properly in Chapter 6. For now: it describes the table's columns, and <code>IF NOT EXISTS</code> means “only create it the first time”.</p>
+
+<h3>server.js: create tables, then start</h3>
+<div class="file-label">server.js</div>
+<pre><code class="language-javascript">const { app } = require('./index.js');
+const { db, createTripTable } = require('./db.js');
+const dotenv = require('dotenv');
+dotenv.config();
+
+async function startServer() {
+  try {
+    await db.query(createTripTable);        // 1. make sure the table exists
+    console.log('Trips table created or already exists.');
+
+    app.listen(process.env.PORT, process.env.HOSTNAME, () =&gt; {   // 2. THEN start
+      console.log(`Server is running at http://${process.env.HOSTNAME}:${process.env.PORT}`);
+    });
+  } catch (error) {
+    console.error('Error initializing the database:', error);
+    process.exitCode = 1;   // tell Windows "the program failed"
+    await db.end();         // close the database connections
+  }
+}
+
+startServer();</code></pre>
+
+<h2 id="query">db.query: the one function you'll use all the time</h2>
+<pre><code class="language-javascript">const [rows] = await db.query(sql, [values]);</code></pre>
+<ul>
+  <li><code>db.query</code> gives back an <strong>array of two things</strong>: <code>[rows, fields]</code>. You only need the first, so you destructure it: <code>const [rows] = ...</code> (Chapter 1, section 8!).</li>
+  <li>For <strong>SELECT</strong>, <code>rows</code> is an array of objects — one per row. The keys are the column names: <code>rows[0].DESTINATION</code>.</li>
+  <li>For <strong>INSERT / UPDATE / DELETE</strong>, you get an info object instead: <code>result.insertId</code> (the new row's id) and <code>result.affectedRows</code> (how many rows changed).</li>
+  <li>The <code>?</code> in the SQL are <strong>placeholders</strong>. MySQL puts the values from the array into them, safely. Always use them for values from the user — Chapter 7 shows why.</li>
+</ul>
+<pre><code class="language-javascript">// SELECT → rows
+const [trips] = await db.query('SELECT * FROM TRIPS WHERE ID = ?', [id]);
+// trips = [ { ID: 2, DESTINATION: 'Rome', COUNTRY: 'Italy', COST: '950.50' } ]  ← or [] if none
+
+// INSERT → result info
+const [result] = await db.query(
+  'INSERT INTO TRIPS (DESTINATION, COUNTRY, COST) VALUES (?, ?, ?)',
+  [destination, country, cost]
+);
+console.log(result.insertId);     // e.g. 8
+console.log(result.affectedRows); // 1</code></pre>
+<div class="callout note"><span class="label">Small detail</span>
+<p>Real MySQL returns <code>DECIMAL</code> columns (like <code>COST</code>) as text: <code>"950.50"</code>. The playground returns a number: <code>950.5</code>. Both are fine for this course.</p></div>
+
+<div class="callout note"><span class="label">About the playground database</span>
+<p>In the exercises below, the <code>TRIPS</code> table already has 7 trips: Paris, Rome, Tokyo, Cairo, Venice, Kyoto and Barcelona (ids 1–7). It resets every time you press Run.</p></div>
+
+<div class="exercise">
+  <span class="ex-tag">Practice 5.3</span>
+  <h4>Your first database controller: GET /trips</h4>
+  <p>Only <code>controllers/tripController.js</code> needs your code. Look at the other tabs to see how everything connects.</p>
+  <div class="runner" id="ex-alltrips" data-express data-db data-entry="server.js">
+<textarea data-file="controllers/tripController.js" data-todo>
+const { db } = require('../db');
+
+// TODO: write retrieveAllTrips
+// 1. an ASYNC arrow function with (req, res)
+// 2. in try: const [trips] = await db.query('SELECT * FROM TRIPS');
+//    → 200 and { status: 'success', results: trips.length, data: trips }
+// 3. in catch: → 500 and { message: 'Database error' }
+
+
+module.exports = { retrieveAllTrips };
+</textarea>
+<textarea data-file="routes/tripRoutes.js" data-readonly>
+const express = require('express');
+const { retrieveAllTrips } = require('../controllers/tripController');
+
+const tripRouter = express.Router();
+
+tripRouter.get('/', retrieveAllTrips);
+
+module.exports = tripRouter;
+</textarea>
+<textarea data-file="db.js" data-readonly>
+const mysql = require('mysql2/promise');
+const dotenv = require('dotenv');
+dotenv.config();
+
+const db = mysql.createPool({
+  host: 'localhost',
+  port: 3306,
+  user: process.env.DB_USER,
+  password: process.env.DB_PASSWORD,
+  database: process.env.DB_NAME
+});
+
+const createTripTable = `CREATE TABLE IF NOT EXISTS TRIPS (
+  ID INT AUTO_INCREMENT PRIMARY KEY,
+  DESTINATION VARCHAR(150) NOT NULL,
+  COUNTRY VARCHAR(150) NOT NULL,
+  COST DECIMAL(10,2) NOT NULL
+)`;
+
+module.exports = { db, createTripTable };
+</textarea>
+<textarea data-file="index.js" data-readonly>
+const express = require('express');
+const tripRouter = require('./routes/tripRoutes');
+
+const app = express();
+app.use(express.json());
+app.use('/trips', tripRouter);
+
+module.exports = { app };
+</textarea>
+<textarea data-file="server.js" data-readonly>
+const { app } = require('./index.js');
+const { db, createTripTable } = require('./db.js');
+const dotenv = require('dotenv');
+dotenv.config();
+
+async function startServer() {
+  try {
+    await db.query(createTripTable);
+    console.log('Trips table created or already exists.');
+
+    app.listen(process.env.PORT, process.env.HOSTNAME, () => {
+      console.log(`Server is running at http://${process.env.HOSTNAME}:${process.env.PORT}`);
+    });
+  } catch (error) {
+    console.error('Error initializing the database:', error);
+    process.exitCode = 1;
+    await db.end();
+  }
+}
+
+startServer();
+</textarea>
+<textarea data-file=".env" data-readonly>
+HOSTNAME=localhost
+PORT=5000
+
+DB_USER=root
+DB_PASSWORD=my_secret_pw
+DB_NAME=travel_db
+</textarea>
+<script type="text/plain" class="tests">
+_test('GET /trips → 200', async () => _eq((await _req('GET', '/trips')).status, 200, 'status'));
+_test('results is 7', async () => _eq((await _req('GET', '/trips')).body.results, 7, 'results'));
+_test('data is the rows from the database', async () => _eq(((await _req('GET', '/trips')).body.data || []).map(t => t.DESTINATION).slice(0, 3), ['Paris', 'Rome', 'Tokyo'], 'first 3 destinations'));
+</script>
+<script type="text/plain" class="tries">
+GET /trips
+</script>
+<script type="text/plain" class="solution" data-file="controllers/tripController.js">
+const { db } = require('../db');
+
+const retrieveAllTrips = async (req, res) => {
+  try {
+    const [trips] = await db.query('SELECT * FROM TRIPS');
+
+    return res.status(200).json({
+      status: 'success',
+      results: trips.length,
+      data: trips
+    });
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({ message: 'Database error' });
+  }
+};
+
+module.exports = { retrieveAllTrips };
+</script>
+  </div>
+  <details class="hint"><summary>Hint</summary><div>Copy the shape of <code>retrieveAllUsers</code> from the “Errors with await” section above and change users → trips.</div></details>
+</div>
+
+<div class="exercise">
+  <span class="ex-tag">Practice 5.4</span>
+  <h4>GET /trips/:id with validation</h4>
+  <p>A good “get one” controller checks three things:</p>
+  <ol>
+    <li><strong>Is the id valid?</strong> <code>Number("abc")</code> is <code>NaN</code>; <code>-5</code> and <code>2.5</code> make no sense either. <code>Number.isSafeInteger(id) &amp;&amp; id &gt; 0</code> checks all of that. If invalid → <code>400</code>.</li>
+    <li><strong>Did the database find it?</strong> <code>trips.length === 0</code> → <code>404</code>.</li>
+    <li>Otherwise → <code>200</code> with <code>trips[0]</code> (the first and only row — not the whole array).</li>
+  </ol>
+  <div class="runner" id="ex-onetrip" data-express data-db data-entry="server.js">
+<textarea data-file="controllers/tripController.js" data-todo>
+const { db } = require('../db');
+
+const retrieveAllTrips = async (req, res) => {
+  try {
+    const [trips] = await db.query('SELECT * FROM TRIPS');
+    return res.status(200).json({ status: 'success', results: trips.length, data: trips });
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({ message: 'Database error' });
+  }
+};
+
+// TODO: retrieveTripById
+// - id = Number(req.params.id)
+// - invalid id (not a safe integer, or <= 0) → 400 { message: 'Invalid trip ID' }
+// - SELECT * FROM TRIPS WHERE ID = ?   (use the placeholder!)
+// - no rows → 404 { message: 'Trip not found' }
+// - found   → 200 { data: trips[0] }
+// - catch   → 500 { message: 'Database error' }
+
+
+module.exports = { retrieveAllTrips, retrieveTripById };
+</textarea>
+<textarea data-file="routes/tripRoutes.js" data-readonly>
+const express = require('express');
+const { retrieveAllTrips, retrieveTripById } = require('../controllers/tripController');
+
+const tripRouter = express.Router();
+
+tripRouter.get('/', retrieveAllTrips);
+tripRouter.get('/:id', retrieveTripById);
+
+module.exports = tripRouter;
+</textarea>
+<textarea data-file="db.js" data-readonly>
+const mysql = require('mysql2/promise');
+const dotenv = require('dotenv');
+dotenv.config();
+
+const db = mysql.createPool({
+  host: 'localhost',
+  port: 3306,
+  user: process.env.DB_USER,
+  password: process.env.DB_PASSWORD,
+  database: process.env.DB_NAME
+});
+
+module.exports = { db };
+</textarea>
+<textarea data-file="index.js" data-readonly>
+const express = require('express');
+const tripRouter = require('./routes/tripRoutes');
+
+const app = express();
+app.use(express.json());
+app.use('/trips', tripRouter);
+
+module.exports = { app };
+</textarea>
+<textarea data-file="server.js" data-readonly>
+const { app } = require('./index.js');
+const dotenv = require('dotenv');
+dotenv.config();
+
+app.listen(process.env.PORT, process.env.HOSTNAME, () => {
+  console.log(`Server is running at http://${process.env.HOSTNAME}:${process.env.PORT}`);
+});
+</textarea>
+<script type="text/plain" class="tests">
+_test('GET /trips/3 → 200 with Tokyo', async () => { const r = await _req('GET', '/trips/3'); _eq(r.status, 200, 'status'); return _eq(r.body.data && r.body.data.DESTINATION, 'Tokyo', 'data.DESTINATION'); });
+_test('data is ONE object, not an array', async () => !Array.isArray((await _req('GET', '/trips/3')).body.data) || 'data is an array — send trips[0], not trips');
+_test('GET /trips/abc → 400', async () => _eq((await _req('GET', '/trips/abc')).status, 400, 'status'));
+_test('GET /trips/0 → 400', async () => _eq((await _req('GET', '/trips/0')).status, 400, 'status'));
+_test('GET /trips/999 → 404', async () => _eq((await _req('GET', '/trips/999')).status, 404, 'status'));
+</script>
+<script type="text/plain" class="tries">
+GET /trips/3
+GET /trips/abc
+GET /trips/999
+</script>
+<script type="text/plain" class="solution" data-file="controllers/tripController.js">
+const { db } = require('../db');
+
+const retrieveAllTrips = async (req, res) => {
+  try {
+    const [trips] = await db.query('SELECT * FROM TRIPS');
+    return res.status(200).json({ status: 'success', results: trips.length, data: trips });
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({ message: 'Database error' });
+  }
+};
+
+const retrieveTripById = async (req, res) => {
+  const id = Number(req.params.id);
+
+  if (!Number.isSafeInteger(id) || id <= 0) {
+    return res.status(400).json({ message: 'Invalid trip ID' });
+  }
+
+  try {
+    const [trips] = await db.query('SELECT * FROM TRIPS WHERE ID = ?', [id]);
+
+    if (trips.length === 0) {
+      return res.status(404).json({ message: 'Trip not found' });
+    }
+
+    return res.status(200).json({ data: trips[0] });
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({ message: 'Database error' });
+  }
+};
+
+module.exports = { retrieveAllTrips, retrieveTripById };
+</script>
+  </div>
+</div>
+
+<div class="exercise">
+  <span class="ex-tag">Practice 5.5</span>
+  <h4>POST /trips: insert a row</h4>
+  <p>After an INSERT, the course does a second query to fetch the new row with <code>result.insertId</code>, so the response contains exactly what's in the database.</p>
+  <div class="runner" id="ex-createtrip" data-express data-db data-entry="server.js">
+<textarea data-file="controllers/tripController.js" data-todo>
+const { db } = require('../db');
+
+const retrieveAllTrips = async (req, res) => {
+  try {
+    const [trips] = await db.query('SELECT * FROM TRIPS');
+    return res.status(200).json({ status: 'success', results: trips.length, data: trips });
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({ message: 'Database error' });
+  }
+};
+
+// TODO: createTrip
+// 1. destination, country, cost from req.body
+// 2. if destination or country is missing, or cost is undefined → 400 { message: 'Please provide all required fields' }
+// 3. if cost is not a number (typeof cost !== 'number') or cost < 0 → 400 { message: 'Cost must be a positive number' }
+// 4. INSERT INTO TRIPS (DESTINATION, COUNTRY, COST) VALUES (?, ?, ?)
+// 5. SELECT * FROM TRIPS WHERE ID = ?   with result.insertId
+// 6. → 201 { message: 'Trip created successfully', data: newTrip[0] }
+// 7. catch → 500 { message: 'Database error' }
+
+
+module.exports = { retrieveAllTrips, createTrip };
+</textarea>
+<textarea data-file="routes/tripRoutes.js" data-readonly>
+const express = require('express');
+const { retrieveAllTrips, createTrip } = require('../controllers/tripController');
+
+const tripRouter = express.Router();
+
+tripRouter.get('/', retrieveAllTrips);
+tripRouter.post('/', createTrip);
+
+module.exports = tripRouter;
+</textarea>
+<textarea data-file="db.js" data-readonly>
+const mysql = require('mysql2/promise');
+const dotenv = require('dotenv');
+dotenv.config();
+
+const db = mysql.createPool({
+  host: 'localhost',
+  port: 3306,
+  user: process.env.DB_USER,
+  password: process.env.DB_PASSWORD,
+  database: process.env.DB_NAME
+});
+
+module.exports = { db };
+</textarea>
+<textarea data-file="index.js" data-readonly>
+const express = require('express');
+const tripRouter = require('./routes/tripRoutes');
+
+const app = express();
+app.use(express.json());
+app.use('/trips', tripRouter);
+
+module.exports = { app };
+</textarea>
+<textarea data-file="server.js" data-readonly>
+const { app } = require('./index.js');
+const dotenv = require('dotenv');
+dotenv.config();
+
+app.listen(process.env.PORT, process.env.HOSTNAME, () => {
+  console.log(`Server is running at http://${process.env.HOSTNAME}:${process.env.PORT}`);
+});
+</textarea>
+<script type="text/plain" class="tests">
+_test('missing country → 400', async () => _eq((await _req('POST', '/trips', { destination: 'Lisbon', cost: 780 })).status, 400, 'status'));
+_test('cost "cheap" → 400', async () => _eq((await _req('POST', '/trips', { destination: 'Lisbon', country: 'Portugal', cost: 'cheap' })).status, 400, 'status'));
+_test('valid trip → 201 with the new row (ID 8)', async () => { const r = await _req('POST', '/trips', { destination: 'Lisbon', country: 'Portugal', cost: 780 }); _eq(r.status, 201, 'status'); return _eq(r.body.data && [r.body.data.ID, r.body.data.DESTINATION], [8, 'Lisbon'], 'data ID, DESTINATION'); });
+_test('the trip is really in the database', async () => _eq(_db('SELECT COUNT(*) AS n FROM TRIPS')[0].n, 8, 'number of trips'));
+</script>
+<script type="text/plain" class="tries">
+POST /trips {"destination": "Lisbon", "country": "Portugal", "cost": 780}
+POST /trips {"destination": "Lisbon"}
+GET /trips
+</script>
+<script type="text/plain" class="solution" data-file="controllers/tripController.js">
+const { db } = require('../db');
+
+const retrieveAllTrips = async (req, res) => {
+  try {
+    const [trips] = await db.query('SELECT * FROM TRIPS');
+    return res.status(200).json({ status: 'success', results: trips.length, data: trips });
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({ message: 'Database error' });
+  }
+};
+
+const createTrip = async (req, res) => {
+  const { destination, country, cost } = req.body;
+
+  if (!destination || !country || cost === undefined) {
+    return res.status(400).json({ message: 'Please provide all required fields' });
+  }
+
+  if (typeof cost !== 'number' || cost < 0) {
+    return res.status(400).json({ message: 'Cost must be a positive number' });
+  }
+
+  try {
+    const [result] = await db.query(
+      'INSERT INTO TRIPS (DESTINATION, COUNTRY, COST) VALUES (?, ?, ?)',
+      [destination, country, cost]
+    );
+
+    const [newTrip] = await db.query('SELECT * FROM TRIPS WHERE ID = ?', [result.insertId]);
+
+    return res.status(201).json({
+      message: 'Trip created successfully',
+      data: newTrip[0]
+    });
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({ message: 'Database error' });
+  }
+};
+
+module.exports = { retrieveAllTrips, createTrip };
+</script>
+  </div>
+  <details class="hint"><summary>Hint 1</summary><div>Do the validation <em>before</em> the <code>try</code>. Every <code>res.status(...)</code> that ends early needs <code>return</code>.</div></details>
+  <details class="hint"><summary>Hint 2</summary><div><code>const [result] = await db.query('INSERT INTO TRIPS (DESTINATION, COUNTRY, COST) VALUES (?, ?, ?)', [destination, country, cost]);</code></div></details>
+</div>
+
+<div class="exercise">
+  <span class="ex-tag">Practice 5.6</span>
+  <h4>DELETE /trips/:id</h4>
+  <p>For DELETE you don't need to SELECT first: <code>result.affectedRows</code> tells you how many rows were deleted. <code>0</code> means the id didn't exist → 404.</p>
+  <div class="runner" id="ex-deletetrip" data-express data-db data-entry="server.js">
+<textarea data-file="controllers/tripController.js" data-todo>
+const { db } = require('../db');
+
+// TODO: deleteTripById
+// - validate the id like in 5.4 → 400 { message: 'Invalid trip ID' }
+// - DELETE FROM TRIPS WHERE ID = ?
+// - result.affectedRows === 0 → 404 { message: 'Trip not found' }
+// - otherwise → 200 { message: 'Trip deleted successfully' }
+// - catch → 500 { message: 'Database error' }
+
+
+module.exports = { deleteTripById };
+</textarea>
+<textarea data-file="routes/tripRoutes.js" data-readonly>
+const express = require('express');
+const { deleteTripById } = require('../controllers/tripController');
+
+const tripRouter = express.Router();
+
+tripRouter.delete('/:id', deleteTripById);
+
+module.exports = tripRouter;
+</textarea>
+<textarea data-file="db.js" data-readonly>
+const mysql = require('mysql2/promise');
+const dotenv = require('dotenv');
+dotenv.config();
+
+const db = mysql.createPool({
+  host: 'localhost',
+  port: 3306,
+  user: process.env.DB_USER,
+  password: process.env.DB_PASSWORD,
+  database: process.env.DB_NAME
+});
+
+module.exports = { db };
+</textarea>
+<textarea data-file="index.js" data-readonly>
+const express = require('express');
+const tripRouter = require('./routes/tripRoutes');
+
+const app = express();
+app.use(express.json());
+app.use('/trips', tripRouter);
+
+module.exports = { app };
+</textarea>
+<textarea data-file="server.js" data-readonly>
+const { app } = require('./index.js');
+const dotenv = require('dotenv');
+dotenv.config();
+
+app.listen(process.env.PORT, process.env.HOSTNAME, () => {
+  console.log(`Server is running at http://${process.env.HOSTNAME}:${process.env.PORT}`);
+});
+</textarea>
+<script type="text/plain" class="tests">
+_test('DELETE /trips/7 → 200', async () => _eq((await _req('DELETE', '/trips/7')).status, 200, 'status'));
+_test('trip 7 is gone from the database', async () => _eq(_db('SELECT * FROM TRIPS WHERE ID = 7').length, 0, 'rows with ID 7'));
+_test('DELETE /trips/999 → 404', async () => _eq((await _req('DELETE', '/trips/999')).status, 404, 'status'));
+_test('DELETE /trips/xyz → 400', async () => _eq((await _req('DELETE', '/trips/xyz')).status, 400, 'status'));
+</script>
+<script type="text/plain" class="tries">
+DELETE /trips/7
+DELETE /trips/7
+DELETE /trips/1
+</script>
+<script type="text/plain" class="solution" data-file="controllers/tripController.js">
+const { db } = require('../db');
+
+const deleteTripById = async (req, res) => {
+  const id = Number(req.params.id);
+
+  if (!Number.isSafeInteger(id) || id <= 0) {
+    return res.status(400).json({ message: 'Invalid trip ID' });
+  }
+
+  try {
+    const [result] = await db.query('DELETE FROM TRIPS WHERE ID = ?', [id]);
+
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ message: 'Trip not found' });
+    }
+
+    return res.status(200).json({ message: 'Trip deleted successfully' });
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({ message: 'Database error' });
+  }
+};
+
+module.exports = { deleteTripById };
+</script>
+  </div>
+  <p>Try <code>DELETE /trips/1</code> after it works: you get a 500, and the terminal says <em>“a foreign key constraint fails”</em>. Trip 1 has reviews pointing at it, and MySQL protects them. Chapter 8 explains this.</p>
+</div>
+
+<div class="exercise">
+  <span class="ex-tag bug">Spot the bugs 5.7</span>
+  <p>This controller has <strong>three</strong> bugs. Both routes answer badly. Find them all.</p>
+  <div class="callout tip"><span class="label">Debugging tip</span><p>The catch block hides the real error from you! Add <code>console.error(error);</code> inside each <code>catch</code>, run again, and read the terminal output.</p></div>
+  <div class="runner" id="ex-bugs5" data-express data-db data-entry="server.js">
+<textarea data-file="controllers/tripController.js">
+const { db } = require('../db');
+
+const retrieveAllTrips = async (req, res) => {
+  try {
+    const [trips] = db.query('SELECT * FROM TRIPS');
+    return res.status(200).json({ status: 'success', results: trips.length, data: trips });
+  } catch (error) {
+    return res.status(500).json({ message: 'Database error' });
+  }
+};
+
+const retrieveTripById = async (req, res) => {
+  const id = Number(req.params.id);
+  if (!Number.isSafeInteger(id) || id <= 0) {
+    return res.status(400).json({ message: 'Invalid trip ID' });
+  }
+  try {
+    const [trips] = await db.query('SELECT * FROM TRIP WHERE ID = ?', [id]);
+    if (trips.length === 0) {
+      return res.status(404).json({ message: 'Trip not found' });
+    }
+    return res.status(200).json({ data: trips });
+  } catch (error) {
+    return res.status(500).json({ message: 'Database error' });
+  }
+};
+
+module.exports = { retrieveAllTrips, retrieveTripById };
+</textarea>
+<textarea data-file="routes/tripRoutes.js" data-readonly>
+const express = require('express');
+const { retrieveAllTrips, retrieveTripById } = require('../controllers/tripController');
+
+const tripRouter = express.Router();
+
+tripRouter.get('/', retrieveAllTrips);
+tripRouter.get('/:id', retrieveTripById);
+
+module.exports = tripRouter;
+</textarea>
+<textarea data-file="db.js" data-readonly>
+const mysql = require('mysql2/promise');
+const dotenv = require('dotenv');
+dotenv.config();
+
+const db = mysql.createPool({
+  host: 'localhost',
+  port: 3306,
+  user: process.env.DB_USER,
+  password: process.env.DB_PASSWORD,
+  database: process.env.DB_NAME
+});
+
+module.exports = { db };
+</textarea>
+<textarea data-file="index.js" data-readonly>
+const express = require('express');
+const tripRouter = require('./routes/tripRoutes');
+
+const app = express();
+app.use(express.json());
+app.use('/trips', tripRouter);
+
+module.exports = { app };
+</textarea>
+<textarea data-file="server.js" data-readonly>
+const { app } = require('./index.js');
+const dotenv = require('dotenv');
+dotenv.config();
+
+app.listen(process.env.PORT, process.env.HOSTNAME, () => {
+  console.log(`Server is running at http://${process.env.HOSTNAME}:${process.env.PORT}`);
+});
+</textarea>
+<script type="text/plain" class="tests">
+_test('GET /trips → 200 with 7 trips', async () => { const r = await _req('GET', '/trips'); _eq(r.status, 200, 'status'); return _eq(r.body.results, 7, 'results'); });
+_test('GET /trips/2 → 200', async () => _eq((await _req('GET', '/trips/2')).status, 200, 'status'));
+_test('GET /trips/2 → data is the Rome object (not an array)', async () => _eq(((await _req('GET', '/trips/2')).body.data || {}).DESTINATION, 'Rome', 'data.DESTINATION'));
+</script>
+<script type="text/plain" class="tries">
+GET /trips
+GET /trips/2
+</script>
+<script type="text/plain" class="solution" data-file="controllers/tripController.js">
+const { db } = require('../db');
+
+const retrieveAllTrips = async (req, res) => {
+  try {
+    const [trips] = await db.query('SELECT * FROM TRIPS');        // bug 1: missing await
+    return res.status(200).json({ status: 'success', results: trips.length, data: trips });
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({ message: 'Database error' });
+  }
+};
+
+const retrieveTripById = async (req, res) => {
+  const id = Number(req.params.id);
+  if (!Number.isSafeInteger(id) || id <= 0) {
+    return res.status(400).json({ message: 'Invalid trip ID' });
+  }
+  try {
+    const [trips] = await db.query('SELECT * FROM TRIPS WHERE ID = ?', [id]);  // bug 2: TRIP → TRIPS
+    if (trips.length === 0) {
+      return res.status(404).json({ message: 'Trip not found' });
+    }
+    return res.status(200).json({ data: trips[0] });                  // bug 3: trips → trips[0]
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({ message: 'Database error' });
+  }
+};
+
+module.exports = { retrieveAllTrips, retrieveTripById };
+</script>
+  </div>
+  <details class="hint"><summary>Hint 1</summary><div>Error “object is not iterable” → you tried to destructure <code>[trips]</code> from something that isn't an array yet… a Promise. What's missing?</div></details>
+  <details class="hint"><summary>Hint 2</summary><div>Error “Table 'travel_db.TRIP' doesn't exist” → check the table name. (This exact typo is in the course's week 8 code!)</div></details>
+  <details class="hint"><summary>Hint 3</summary><div>The last one isn't an error, it's the wrong <em>shape</em>: the client wants one trip object, not a list with one trip in it.</div></details>
+</div>
+
+<h2 id="workbench">See your data in MySQL Workbench</h2>
+<p>After your server creates the table, open Workbench and run (with <kbd>Ctrl</kbd>+<kbd>Enter</kbd>):</p>
+<pre><code class="language-sql">USE travel_db;
+SELECT * FROM TRIPS;</code></pre>
+<p>The table is empty at first. Add a few trips to test with — either through your <code>POST /trips</code> route in Postman, or directly in Workbench:</p>
+<pre><code class="language-sql">INSERT INTO TRIPS (DESTINATION, COUNTRY, COST) VALUES
+  ('Paris', 'France', 1200),
+  ('Rome', 'Italy', 950.50),
+  ('Tokyo', 'Japan', 2100);</code></pre>
+
+<div class="exercise">
+  <span class="ex-tag pc">On your computer</span>
+  <ul class="checklist" data-id="ch5">
+    <li>Ran <code>npm install mysql2 dotenv</code></li>
+    <li>Made <code>.env</code> with my real MySQL password and <code>DB_NAME=travel_db</code></li>
+    <li>Made <code>.gitignore</code> with <code>node_modules</code> and <code>.env</code></li>
+    <li>Made <code>db.js</code> with the pool and the <code>CREATE TABLE</code> text</li>
+    <li><code>server.js</code> creates the table, then calls <code>listen</code></li>
+    <li>The terminal says “Trips table created or already exists.”</li>
+    <li>Wrote the trips controller + routes: GET all, GET one, POST, DELETE</li>
+    <li>Tested all of them in Postman and saw the changes in Workbench</li>
+  </ul>
+  <details class="hint"><summary>Problems connecting?</summary>
+    <div>
+      <ul>
+        <li><strong>ER_ACCESS_DENIED_ERROR</strong> → wrong <code>DB_USER</code>/<code>DB_PASSWORD</code> in <code>.env</code>, or <code>dotenv.config()</code> runs after <code>createPool</code>.</li>
+        <li><strong>ER_BAD_DB_ERROR: Unknown database</strong> → the database doesn't exist yet. Run <code>CREATE DATABASE travel_db;</code> in Workbench.</li>
+        <li><strong>ECONNREFUSED 127.0.0.1:3306</strong> → MySQL isn't running. Start the MySQL service (Chapter 0).</li>
+        <li><strong>Everything is undefined</strong> → is the file called exactly <code>.env</code> (not <code>.env.txt</code>) and is it in the main folder?</li>
+      </ul>
+    </div>
+  </details>
+</div>
+</main>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/javascript/javascript.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/sql/sql.min.js"></script>
+<script src="assets/app.js"></script>
+</body>
+</html>

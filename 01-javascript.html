@@ -1,0 +1,677 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>JavaScript You Need · Backend from Zero</title>
+<meta name="description" content="The JavaScript you actually need for backend: variables, if, objects, arrays, functions, destructuring.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=JetBrains+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.css">
+<link rel="stylesheet" href="assets/style.css">
+<script>try{var t=localStorage.getItem('bfz-theme');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body data-page="01-javascript.html">
+<main>
+<div class="kicker">Chapter 1</div>
+<h1>The JavaScript you need</h1>
+<p class="lead">You don't need all of JavaScript to build a backend. You need about ten things — and you will use them in every single file. Here they are, each with practice.</p>
+
+<div class="callout note"><span class="label">How the code playgrounds work</span>
+<p>Write your code in the box, then press <strong>▶ Run</strong> (or <kbd>Ctrl</kbd>+<kbd>Enter</kbd>). You'll see what it printed, plus <strong>Checks</strong> that tell you which parts are right. Your code is saved automatically in this browser.</p></div>
+
+<h2 id="console">1. Printing with console.log</h2>
+<p><code>console.log(...)</code> prints something in the terminal. It is your best friend for finding bugs: when you don't know what a value is, <strong>print it</strong>.</p>
+<pre><code class="language-javascript">console.log("Hello");          // prints: Hello
+console.log(5 + 5);            // prints: 10
+console.log("Total:", 5 + 5);  // prints: Total: 10
+// Lines starting with // are comments. JavaScript ignores them.</code></pre>
+
+<h2 id="variables">2. Variables: const and let</h2>
+<p>A variable is a <strong>box with a name</strong> that holds a value.</p>
+<pre><code class="language-javascript">const name = "Sara";   // const = this box will NOT get a new value
+let age = 20;          // let   = this box CAN get a new value later
+age = 21;              // OK, because age is let
+// name = "Omar";      // ERROR: Assignment to constant variable.</code></pre>
+<div class="callout tip"><span class="label">Rule of thumb</span><p>Use <code>const</code> by default. Use <code>let</code> only when you know the value will change. Don't use <code>var</code> (it's the old way).</p></div>
+
+<h3>Template strings</h3>
+<p>Use backticks <code>`</code> (the key under <kbd>Esc</kbd>) to put values inside text with <code>${ }</code>:</p>
+<pre><code class="language-javascript">const city = "Paris";
+const price = 1200;
+const text = `The trip to ${city} costs ${price}`;
+console.log(text); // The trip to Paris costs 1200</code></pre>
+
+<div class="exercise">
+  <span class="ex-tag">Practice 1.1</span>
+  <h4>Variables and template strings</h4>
+  <p>Follow the steps in the comments.</p>
+  <div class="runner" id="ex-vars">
+<textarea data-file="main.js">
+// 1. Make a constant called city with the text "Cairo"
+
+// 2. Make a variable called visits with the number 1 (it will change, so use let)
+
+// 3. Change visits to 2
+
+// 4. Make a constant called summary using a template string.
+//    It must be exactly: I visited Cairo 2 times
+
+// 5. Print summary with console.log
+</textarea>
+<script type="text/plain" class="tests">
+_test('city is "Cairo"', () => _eq(city, 'Cairo', 'city'));
+_test('visits is the number 2', () => _eq(visits, 2, 'visits'));
+_test('summary is "I visited Cairo 2 times"', () => _eq(summary, 'I visited Cairo 2 times', 'summary'));
+_test('summary was printed', () => _logs.some(l => l.text === 'I visited Cairo 2 times') || 'Nothing printed yet — use console.log(summary)');
+</script>
+<script type="text/plain" class="solution">
+const city = "Cairo";
+let visits = 1;
+visits = 2;
+const summary = `I visited ${city} ${visits} times`;
+console.log(summary);
+</script>
+  </div>
+  <details class="hint"><summary>Hint 1</summary><div>A template string looks like <code>`I visited ${something} ...`</code> — with backticks, not quotes.</div></details>
+</div>
+
+<h2 id="types">3. Types: text vs numbers (very important!)</h2>
+<p>Every value has a <strong>type</strong>. The main ones:</p>
+<table>
+  <thead><tr><th>Type</th><th>Examples</th></tr></thead>
+  <tbody>
+    <tr><td>string (text)</td><td><code>"hello"</code>, <code>'sara@mail.com'</code>, <code>"5"</code></td></tr>
+    <tr><td>number</td><td><code>5</code>, <code>950.5</code>, <code>-1</code></td></tr>
+    <tr><td>boolean</td><td><code>true</code>, <code>false</code></td></tr>
+    <tr><td>undefined</td><td>“no value was given” — e.g. a missing field</td></tr>
+    <tr><td>null</td><td>“empty on purpose”</td></tr>
+  </tbody>
+</table>
+<p><code>"5"</code> (text) and <code>5</code> (number) are <strong>different</strong>. This matters a lot in backend, because <strong>everything that comes from a URL is text</strong>. When someone visits <code>/users/3</code>, your code gets <code>"3"</code>, not <code>3</code>.</p>
+<pre><code class="language-javascript">const fromUrl = "3";
+console.log(fromUrl === 3);          // false  (text is not a number)
+console.log(Number(fromUrl) === 3);  // true   (Number() turns text into a number)
+console.log(Number("abc"));          // NaN    ("Not a Number" — the text wasn't a number)
+console.log(typeof fromUrl);         // "string"</code></pre>
+<p>Always compare with <strong><code>===</code></strong> (three equals: same value AND same type). Not equal is <code>!==</code>. Avoid <code>==</code> — it guesses and makes surprising mistakes.</p>
+
+<div class="exercise">
+  <span class="ex-tag">Practice 1.2</span>
+  <div class="quiz">
+    <p class="q">What does <code>"7" === 7</code> give?</p>
+    <div class="options">
+      <button data-why="They look the same, but one is text and one is a number. === checks the type too.">true</button>
+      <button data-correct>false</button>
+      <button data-why="It's a normal comparison — it gives true or false.">An error</button>
+    </div>
+    <div class="explain">One is a string, one is a number, so <code>===</code> says false. Use <code>Number("7") === 7</code> to get true.</div>
+  </div>
+  <div class="runner" id="ex-types">
+<textarea data-file="main.js">
+const idFromUrl = "3";   // things from a URL are ALWAYS text
+
+// TODO 1: make a constant called id that is the NUMBER 3 (use Number())
+
+// TODO 2: make a constant called isSame that compares id with 3 using ===
+
+console.log(id, isSame);
+</textarea>
+<script type="text/plain" class="tests">
+_test('id is the number 3 (not the text "3")', () => _eq(id, 3, 'id'));
+_test('isSame is true', () => _eq(isSame, true, 'isSame'));
+</script>
+<script type="text/plain" class="solution">
+const idFromUrl = "3";
+const id = Number(idFromUrl);
+const isSame = id === 3;
+console.log(id, isSame);
+</script>
+  </div>
+</div>
+
+<h2 id="if">4. Making decisions: if / else</h2>
+<pre><code class="language-javascript">const age = 17;
+if (age >= 18) {
+  console.log("Adult");
+} else if (age >= 13) {
+  console.log("Teen");
+} else {
+  console.log("Child");
+}</code></pre>
+<table>
+  <thead><tr><th>Operator</th><th>Meaning</th><th>Example</th></tr></thead>
+  <tbody>
+    <tr><td><code>===</code> / <code>!==</code></td><td>equal / not equal</td><td><code>role === 'admin'</code></td></tr>
+    <tr><td><code>&gt;</code> <code>&lt;</code> <code>&gt;=</code> <code>&lt;=</code></td><td>bigger / smaller</td><td><code>rating &lt;= 5</code></td></tr>
+    <tr><td><code>&amp;&amp;</code></td><td>AND — both must be true</td><td><code>rating &gt;= 1 &amp;&amp; rating &lt;= 5</code></td></tr>
+    <tr><td><code>||</code></td><td>OR — at least one true</td><td><code>!email || !password</code></td></tr>
+    <tr><td><code>!</code></td><td>NOT — flips true/false</td><td><code>!username</code></td></tr>
+  </tbody>
+</table>
+
+<h3>“Truthy” and “falsy” — the trick behind <code>if (!username)</code></h3>
+<p>In an <code>if</code>, these values count as <strong>false</strong>: <code>""</code> (empty text), <code>0</code>, <code>undefined</code>, <code>null</code>, <code>NaN</code>, <code>false</code>. Everything else counts as true. So:</p>
+<pre><code class="language-javascript">if (!username) {
+  // runs when username is missing: undefined, "", null...
+}</code></pre>
+<p>You'll write this in every server to check that the user sent all the fields.</p>
+
+<div class="exercise">
+  <span class="ex-tag">Practice 1.3</span>
+  <h4>Check the fields</h4>
+  <div class="runner" id="ex-ifelse">
+<textarea data-file="main.js">
+// Write the function checkFields(username, password):
+// - if username OR password is missing → return "Please fill all fields"
+// - otherwise → return "OK"
+function checkFields(username, password) {
+  // your code here
+
+}
+
+console.log(checkFields("sara", "1234"));  // should print: OK
+console.log(checkFields("", "1234"));      // should print: Please fill all fields
+console.log(checkFields("sara"));          // should print: Please fill all fields
+</textarea>
+<script type="text/plain" class="tests">
+_test('checkFields("sara", "1234") returns "OK"', () => _eq(checkFields('sara', '1234'), 'OK'));
+_test('empty username → "Please fill all fields"', () => _eq(checkFields('', '1234'), 'Please fill all fields'));
+_test('missing password → "Please fill all fields"', () => _eq(checkFields('sara'), 'Please fill all fields'));
+_test('both missing → "Please fill all fields"', () => _eq(checkFields(), 'Please fill all fields'));
+</script>
+<script type="text/plain" class="solution">
+function checkFields(username, password) {
+  if (!username || !password) {
+    return "Please fill all fields";
+  }
+  return "OK";
+}
+
+console.log(checkFields("sara", "1234"));
+console.log(checkFields("", "1234"));
+console.log(checkFields("sara"));
+</script>
+  </div>
+  <details class="hint"><summary>Hint 1</summary><div>“username is missing” is <code>!username</code>. “or” is <code>||</code>.</div></details>
+  <details class="hint"><summary>Hint 2</summary><div>Inside the function: <code>if (!username || !password) { return ...; }</code> and after the if, <code>return "OK";</code></div></details>
+</div>
+
+<h2 id="objects">5. Objects: one thing with many details</h2>
+<p>An object groups related values. Each value has a <strong>key</strong> (name). One row of a database becomes one object.</p>
+<pre><code class="language-javascript">const user = {
+  id: 1,
+  username: "sara",
+  email: "sara@mail.com",
+  role: "admin"
+};
+
+console.log(user.username);   // "sara"   ← read with a dot
+user.role = "user";           // change a value
+user.age = 22;                // add a new key
+console.log(user.phone);      // undefined (doesn't exist)</code></pre>
+<div class="callout note"><span class="label">Wait — user is const, but I changed it?</span>
+<p>Yes. <code>const</code> means the box always holds <em>the same object</em>. You can still change what's inside the object. You just can't do <code>user = somethingElse</code>.</p></div>
+
+<div class="exercise">
+  <span class="ex-tag">Practice 1.4</span>
+  <div class="runner" id="ex-objects">
+<textarea data-file="main.js">
+// 1. Make an object called trip with: destination "Rome", country "Italy", cost 950
+
+// 2. Change trip's cost to 999
+
+// 3. Add a new key rating with the value 5
+
+// 4. Make a constant text = "Rome costs 999" using a template string and trip's keys
+
+console.log(trip);
+console.log(text);
+</textarea>
+<script type="text/plain" class="tests">
+_test('trip.destination is "Rome" and country is "Italy"', () => _eq([trip.destination, trip.country], ['Rome', 'Italy'], 'destination, country'));
+_test('trip.cost is 999', () => _eq(trip.cost, 999, 'trip.cost'));
+_test('trip.rating is 5', () => _eq(trip.rating, 5, 'trip.rating'));
+_test('text is "Rome costs 999" and is built from trip', () => _eq(text, 'Rome costs 999', 'text'));
+</script>
+<script type="text/plain" class="solution">
+const trip = { destination: "Rome", country: "Italy", cost: 950 };
+trip.cost = 999;
+trip.rating = 5;
+const text = `${trip.destination} costs ${trip.cost}`;
+console.log(trip);
+console.log(text);
+</script>
+  </div>
+</div>
+
+<h2 id="arrays">6. Arrays: a list of things</h2>
+<p>An array is a list in order. Before you learn databases, your “database” will be an array of objects:</p>
+<pre><code class="language-javascript">const users = [
+  { id: 1, username: "sara", role: "admin" },
+  { id: 2, username: "omar", role: "user" }
+];
+
+console.log(users.length);       // 2
+console.log(users[0].username);  // "sara"  ← counting starts at 0!
+users.push({ id: 3, username: "lina", role: "user" });  // add at the end
+
+// Go through every item with a for loop:
+for (let i = 0; i &lt; users.length; i++) {
+  console.log(users[i].username);
+}
+
+// Shorter way when you don't need the number i:
+for (const user of users) {
+  console.log(user.username);
+}</code></pre>
+
+<div class="exercise">
+  <span class="ex-tag">Practice 1.5</span>
+  <h4>Find a user by id (you'll use exactly this in Chapter 3)</h4>
+  <div class="runner" id="ex-find">
+<textarea data-file="main.js">
+const users = [
+  { id: 1, username: 'sara', role: 'admin' },
+  { id: 2, username: 'omar', role: 'user' },
+  { id: 3, username: 'lina', role: 'user' },
+];
+
+// Write findUserById(id):
+// - loop through users
+// - if a user's id is equal to id → return that user
+// - if the loop finishes and nothing matched → return null
+function findUserById(id) {
+
+}
+
+console.log(findUserById(2));   // { id: 2, username: 'omar', role: 'user' }
+console.log(findUserById(9));   // null
+</textarea>
+<script type="text/plain" class="tests">
+_test('findUserById(1) returns sara', () => _eq(findUserById(1) && findUserById(1).username, 'sara'));
+_test('findUserById(3) returns lina (the LAST one — check your loop goes to the end)', () => _eq(findUserById(3) && findUserById(3).username, 'lina'));
+_test('findUserById(9) returns null', () => _eq(findUserById(9), null));
+</script>
+<script type="text/plain" class="solution">
+const users = [
+  { id: 1, username: 'sara', role: 'admin' },
+  { id: 2, username: 'omar', role: 'user' },
+  { id: 3, username: 'lina', role: 'user' },
+];
+
+function findUserById(id) {
+  for (let i = 0; i < users.length; i++) {
+    if (users[i].id === id) {
+      return users[i];
+    }
+  }
+  return null; // only AFTER the loop!
+}
+
+console.log(findUserById(2));
+console.log(findUserById(9));
+</script>
+  </div>
+  <details class="hint"><summary>Hint 1</summary><div>The loop: <code>for (let i = 0; i &lt; users.length; i++) { ... }</code>. Inside it, compare <code>users[i].id === id</code>.</div></details>
+  <details class="hint"><summary>Hint 2 (the classic mistake)</summary><div>Don't put <code>return null</code> inside the loop! Then the loop stops after checking only the first user. Put it <strong>after</strong> the loop's closing <code>}</code>.</div></details>
+</div>
+
+<h3>Useful array methods</h3>
+<p>Arrays have built-in helpers that do the loop for you. Each one takes a <strong>function</strong> that runs for every item:</p>
+<pre><code class="language-javascript">const nums = [5, 12, 8];
+nums.find(n =&gt; n &gt; 6);        // 12           first item that matches
+nums.filter(n =&gt; n &gt; 6);      // [12, 8]      ALL items that match
+nums.map(n =&gt; n * 2);         // [10, 24, 16] change every item
+nums.findIndex(n =&gt; n === 8); // 2            position of the match (-1 if none)
+nums.splice(1, 1);            // removes 1 item at position 1 → nums is now [5, 8]</code></pre>
+
+<div class="exercise">
+  <span class="ex-tag">Practice 1.6</span>
+  <div class="runner" id="ex-filtermap">
+<textarea data-file="main.js">
+const users = [
+  { id: 1, username: 'sara', role: 'admin' },
+  { id: 2, username: 'omar', role: 'user' },
+  { id: 3, username: 'lina', role: 'admin' },
+];
+
+// TODO 1: make admins = only the users whose role is 'admin' (use filter)
+
+// TODO 2: make usernames = an array with only the usernames (use map)
+//         → ['sara', 'omar', 'lina']
+
+console.log(admins);
+console.log(usernames);
+</textarea>
+<script type="text/plain" class="tests">
+_test('admins has sara and lina', () => _eq(admins.map(u => u.username), ['sara', 'lina'], 'admin usernames'));
+_test('usernames is [sara, omar, lina]', () => _eq(usernames, ['sara', 'omar', 'lina'], 'usernames'));
+</script>
+<script type="text/plain" class="solution">
+const users = [
+  { id: 1, username: 'sara', role: 'admin' },
+  { id: 2, username: 'omar', role: 'user' },
+  { id: 3, username: 'lina', role: 'admin' },
+];
+
+const admins = users.filter(user => user.role === 'admin');
+const usernames = users.map(user => user.username);
+
+console.log(admins);
+console.log(usernames);
+</script>
+  </div>
+</div>
+
+<h2 id="functions">7. Functions (and functions as values)</h2>
+<p>A function is a <strong>recipe</strong>: steps with a name that you can run any time. It can take inputs (<em>parameters</em>) and give back an output (<code>return</code>).</p>
+<pre><code class="language-javascript">// Normal function
+function addTax(price) {
+  return price * 1.14;
+}
+
+// Arrow function — the same thing, shorter. You'll see this EVERYWHERE in Express.
+const addTax2 = (price) =&gt; {
+  return price * 1.14;
+};
+
+// If the body is just one return, even shorter:
+const addTax3 = price =&gt; price * 1.14;
+
+console.log(addTax(100)); // 114</code></pre>
+
+<h3>The big idea: passing a function to another function</h3>
+<p>In JavaScript you can give a function to another function, so it can run it <strong>later</strong>. This is exactly what Express does:</p>
+<pre><code class="language-javascript">app.get('/hello', (req, res) =&gt; {
+  res.json({ message: 'Hi' });
+});
+// You're NOT running the arrow function now.
+// You're saying: "Express, when someone visits /hello, run THIS function."</code></pre>
+
+<div class="exercise">
+  <span class="ex-tag">Practice 1.7</span>
+  <h4>A tiny fake Express</h4>
+  <div class="runner" id="ex-callbacks">
+<textarea data-file="main.js">
+// This tiny "app" saves functions to run later — like Express does.
+const routes = {};
+function addRoute(path, handler) {
+  routes[path] = handler;
+}
+
+// TODO 1: call addRoute with the path '/hello' and an ARROW FUNCTION
+//         that returns the text "Hi!"
+
+
+// TODO 2: call addRoute with the path '/double' and an arrow function
+//         that takes a number n and returns n * 2
+
+
+// Later, "a visitor comes" and we run the saved functions:
+console.log(routes['/hello']());     // Hi!
+console.log(routes['/double'](21));  // 42
+</textarea>
+<script type="text/plain" class="tests">
+_test("routes['/hello'] is a function", () => typeof routes['/hello'] === 'function' || 'routes["/hello"] is ' + typeof routes['/hello']);
+_test("routes['/hello']() returns \"Hi!\"", () => _eq(routes['/hello'](), 'Hi!'));
+_test("routes['/double'](21) returns 42", () => _eq(routes['/double'](21), 42));
+</script>
+<script type="text/plain" class="solution">
+const routes = {};
+function addRoute(path, handler) {
+  routes[path] = handler;
+}
+
+addRoute('/hello', () => {
+  return "Hi!";
+});
+
+addRoute('/double', (n) => n * 2);
+
+console.log(routes['/hello']());
+console.log(routes['/double'](21));
+</script>
+  </div>
+  <details class="hint"><summary>Hint</summary><div><code>addRoute('/hello', () =&gt; { return "Hi!"; });</code> — the second argument is the whole arrow function.</div></details>
+</div>
+
+<h2 id="destructuring">8. Destructuring: unpacking values</h2>
+<p>A short way to take values out of an object or array. You'll write this at the top of almost every route:</p>
+<pre><code class="language-javascript">const body = { username: "sara", email: "sara@mail.com", role: "admin" };
+
+// Long way:
+const username = body.username;
+const email = body.email;
+
+// Destructuring — same result, one line:
+const { username, email } = body;   // takes the keys with THE SAME NAMES</code></pre>
+<p>Arrays work by <strong>position</strong> instead of name:</p>
+<pre><code class="language-javascript">const result = [ ["row1", "row2"], "extra info" ];
+const [rows] = result;        // rows = the FIRST item → ["row1", "row2"]
+const [rows2, info] = result; // first and second item</code></pre>
+<p>This is why database code looks like <code>const [users] = await db.query(...)</code> — the database gives back an array whose first item is the rows.</p>
+
+<div class="exercise">
+  <span class="ex-tag">Practice 1.8</span>
+  <div class="blanks">
+<p>Fill the blanks so <code>username</code> and <code>password</code> come out of <code>req.body</code>, and <code>trips</code> is the first item of <code>result</code>:</p>
+<pre><code class="nohl">const <input data-a="{ username, password }|||{ password, username }"> = req.body;
+
+const <input data-a="[trips]"> = result;</code></pre>
+  </div>
+  <div class="runner" id="ex-destructure">
+<textarea data-file="main.js">
+const req = {
+  body: { title: 'Paris trip', cost: 1200 },
+  params: { id: '7' }
+};
+const result = [[{ ID: 1 }, { ID: 2 }], { info: 'extra stuff' }];
+
+// TODO 1: with destructuring, make title and cost from req.body
+
+// TODO 2: with destructuring, make id from req.params
+
+// TODO 3: with ARRAY destructuring, make rows = the first item of result
+
+console.log(title, cost, id, rows);
+</textarea>
+<script type="text/plain" class="tests">
+_test('title is "Paris trip" and cost is 1200', () => _eq([title, cost], ['Paris trip', 1200]));
+_test('id is "7"', () => _eq(id, '7', 'id'));
+_test('rows is the array of 2 rows', () => _eq(rows, [{ ID: 1 }, { ID: 2 }], 'rows'));
+</script>
+<script type="text/plain" class="solution">
+const req = {
+  body: { title: 'Paris trip', cost: 1200 },
+  params: { id: '7' }
+};
+const result = [[{ ID: 1 }, { ID: 2 }], { info: 'extra stuff' }];
+
+const { title, cost } = req.body;
+const { id } = req.params;
+const [rows] = result;
+
+console.log(title, cost, id, rows);
+</script>
+  </div>
+</div>
+
+<h2 id="fallback">9. Fallback values with ||</h2>
+<p><code>a || b</code> gives <code>a</code> if it's truthy, otherwise <code>b</code>. Perfect for “use the new value if they sent one, else keep the old one”:</p>
+<pre><code class="language-javascript">const newName = undefined;  // the user didn't send a new name
+const finalName = newName || "sara";  // → "sara"</code></pre>
+
+<div class="exercise">
+  <span class="ex-tag">Practice 1.9</span>
+  <h4>Partial update (used in every “update” route)</h4>
+  <div class="runner" id="ex-fallback">
+<textarea data-file="main.js">
+const oldUser = { username: 'sara', email: 'sara@mail.com', role: 'user' };
+
+// The client sends ONLY what they want to change:
+const body = { email: 'new@mail.com' };
+
+// TODO: make updated = an object with username, email and role,
+// where each one is the new value from body OR (if missing) the old value.
+
+console.log(updated); // { username: 'sara', email: 'new@mail.com', role: 'user' }
+</textarea>
+<script type="text/plain" class="tests">
+_test('updated has the new email and keeps the rest', () => _eq(updated, { username: 'sara', email: 'new@mail.com', role: 'user' }, 'updated'));
+</script>
+<script type="text/plain" class="solution">
+const oldUser = { username: 'sara', email: 'sara@mail.com', role: 'user' };
+const body = { email: 'new@mail.com' };
+
+const updated = {
+  username: body.username || oldUser.username,
+  email: body.email || oldUser.email,
+  role: body.role || oldUser.role
+};
+
+console.log(updated);
+</script>
+  </div>
+</div>
+
+<h2 id="errors">10. Errors: try / catch</h2>
+<p>Sometimes code fails (the database is down, the data is wrong…). Without protection, the program crashes. <code>try / catch</code> says: “<em>try</em> this; if anything goes wrong, <em>catch</em> the error and do this instead.”</p>
+<pre><code class="language-javascript">try {
+  const data = JSON.parse("this is not JSON");  // this throws an error
+  console.log("never printed");
+} catch (error) {
+  console.log("Something went wrong:", error.message);
+}
+console.log("The program keeps running!");</code></pre>
+<p>You can also <strong>throw</strong> your own errors: <code>throw new Error("Something bad")</code>.</p>
+
+<div class="exercise">
+  <span class="ex-tag">Practice 1.10</span>
+  <div class="runner" id="ex-trycatch">
+<textarea data-file="main.js">
+function divide(a, b) {
+  if (b === 0) {
+    throw new Error('Cannot divide by zero');
+  }
+  return a / b;
+}
+
+let message = 'no error';
+
+// TODO: call divide(10, 0) inside a try block.
+// In the catch block, put the error's message into the variable message.
+
+
+console.log(message); // Cannot divide by zero
+</textarea>
+<script type="text/plain" class="tests">
+_test('message is "Cannot divide by zero"', () => _eq(message, 'Cannot divide by zero', 'message'));
+</script>
+<script type="text/plain" class="solution">
+function divide(a, b) {
+  if (b === 0) {
+    throw new Error('Cannot divide by zero');
+  }
+  return a / b;
+}
+
+let message = 'no error';
+
+try {
+  divide(10, 0);
+} catch (error) {
+  message = error.message;
+}
+
+console.log(message);
+</script>
+  </div>
+</div>
+
+<h2 id="challenge">Chapter challenge: a tiny in-memory database</h2>
+<div class="exercise">
+  <span class="ex-tag">Challenge 1.11</span>
+  <p>This is basically what your first server will do (Chapter 3), just without the server part. Write <code>addUser</code> and <code>deleteUser</code>.</p>
+  <div class="runner" id="ex-minidb">
+<textarea data-file="main.js">
+const users = [
+  { id: 1, username: 'sara' },
+  { id: 2, username: 'omar' },
+];
+
+// addUser(username):
+//   - new id = the HIGHEST id in the list + 1  (if the list is empty, use 1)
+//   - push { id, username } into users
+//   - return the new user
+function addUser(username) {
+
+}
+
+// deleteUser(id):
+//   - find the POSITION of the user with that id (findIndex)
+//   - if not found (-1) → return false
+//   - else remove it with splice and return true
+function deleteUser(id) {
+
+}
+
+console.log(addUser('lina'));   // { id: 3, username: 'lina' }
+console.log(deleteUser(1));     // true
+console.log(deleteUser(99));    // false
+console.log(addUser('youssef'));// { id: 4, username: 'youssef' }  ← NOT 3!
+console.log(users);
+</textarea>
+<script type="text/plain" class="tests">
+_test('addUser("lina") returns { id: 3, username: "lina" }', () => _eq(users.find(u => u.username === 'lina'), { id: 3, username: 'lina' }));
+_test('deleteUser(1) removed sara', () => !users.some(u => u.id === 1) || 'user 1 is still in the list');
+_test('deleteUser(99) returns false', () => _eq(deleteUser(99), false));
+_test('after a delete, the next id is still unique (youssef got 4)', () => _eq(users.find(u => u.username === 'youssef') && users.find(u => u.username === 'youssef').id, 4, "youssef's id"));
+</script>
+<script type="text/plain" class="solution">
+const users = [
+  { id: 1, username: 'sara' },
+  { id: 2, username: 'omar' },
+];
+
+function addUser(username) {
+  let highest = 0;
+  for (const user of users) {
+    if (user.id > highest) highest = user.id;
+  }
+  const newUser = { id: highest + 1, username };
+  users.push(newUser);
+  return newUser;
+}
+
+function deleteUser(id) {
+  const index = users.findIndex(user => user.id === id);
+  if (index === -1) {
+    return false;
+  }
+  users.splice(index, 1);
+  return true;
+}
+
+console.log(addUser('lina'));
+console.log(deleteUser(1));
+console.log(deleteUser(99));
+console.log(addUser('youssef'));
+console.log(users);
+</script>
+  </div>
+  <details class="hint"><summary>Hint 1 — why not users.length + 1?</summary><div>After deleting sara, the list has 2 users (omar id 2, lina id 3). <code>users.length + 1</code> would be 3 — but lina already has id 3! Two users with the same id = big bug. That's why you look for the highest id instead. (Real databases do this for you with <code>AUTO_INCREMENT</code>.)</div></details>
+  <details class="hint"><summary>Hint 2</summary><div>Start with <code>let highest = 0;</code>, loop over users, and if <code>user.id &gt; highest</code> then <code>highest = user.id</code>.</div></details>
+</div>
+
+<div class="callout tip"><span class="label">You now know enough JavaScript</span>
+<p>Seriously. Variables, if, objects, arrays, functions, destructuring, <code>||</code> and try/catch are 90% of the backend code you'll write. The rest (<code>async/await</code>, <code>require</code>) comes when you need it.</p></div>
+</main>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/javascript/javascript.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/sql/sql.min.js"></script>
+<script src="assets/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,204 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Build It From Zero · Backend from Zero</title>
+<meta name="description" content="A step-by-step plan to build the complete backend project yourself, plus a planner to adapt it to any topic.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=JetBrains+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.css">
+<link rel="stylesheet" href="assets/style.css">
+<script>try{var t=localStorage.getItem('bfz-theme');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body data-page="09-build-it.html">
+<main>
+<div class="kicker">Chapter 9 · the final practice</div>
+<h1>Build it from zero</h1>
+<p class="lead">Now build the whole travel API yourself, from an empty folder, in VS Code. Phase by phase. Don't copy from the earlier chapters — go back to them only when you're stuck.</p>
+
+<div class="callout tip"><span class="label">How to use this page</span>
+<ul>
+  <li>Do one phase at a time. <strong>Test before you move on</strong> — a bug is easy to find when you only changed a little.</li>
+  <li>Every phase has a <strong>“Done when”</strong> check. Tick the boxes (they're saved).</li>
+  <li>Hints point you back to the right chapter instead of giving code.</li>
+  <li>When it all works, do it a <strong>second time</strong>, faster. The second time is when it really sticks.</li>
+</ul></div>
+
+<h2 id="phase0">Phase 0 — Set up the project</h2>
+<p><strong>Goal:</strong> an empty project with everything installed.</p>
+<ul class="checklist" data-id="p0">
+  <li>New folder <code>travel-api</code>, opened in VS Code</li>
+  <li><code>npm init -y</code></li>
+  <li><code>npm install express mysql2 dotenv bcrypt cookie-parser</code></li>
+  <li>Folders: <code>routes</code>, <code>controllers</code>, <code>utils</code></li>
+  <li><code>.gitignore</code> with <code>node_modules</code> and <code>.env</code></li>
+  <li><code>.env</code> with HOSTNAME, PORT, DB_USER, DB_PASSWORD, DB_NAME — and <code>.env.example</code> with fake values</li>
+  <li>The database exists in Workbench (<code>CREATE DATABASE travel_db;</code>)</li>
+</ul>
+<p>You should end up with this shape (files get filled in the next phases):</p>
+<div class="tree">travel-api/
+├── .env  .env.example  .gitignore  package.json
+├── server.js
+├── index.js
+├── db.js
+├── utils/validators.js
+├── routes/       userRoutes.js  authRoutes.js  tripRoutes.js
+└── controllers/  userController.js  authController.js  tripController.js</div>
+<details class="hint"><summary>Stuck?</summary><div>Chapter 0 (installing, npm) and Chapter 5 (<code>.env</code>, <code>.gitignore</code>).</div></details>
+
+<h2 id="phase1">Phase 1 — The app skeleton</h2>
+<p><strong>Goal:</strong> a running server with one test route.</p>
+<ul class="checklist" data-id="p1">
+  <li><code>index.js</code>: create the app, <code>express.json()</code>, <code>cookieParser()</code>, export <code>{ app }</code></li>
+  <li>A temporary route in index.js: <code>GET /health</code> → <code>{ status: 'ok' }</code></li>
+  <li><code>server.js</code>: require the app, <code>dotenv.config()</code>, <code>app.listen(process.env.PORT, process.env.HOSTNAME, …)</code></li>
+  <li><strong>Done when:</strong> <code>node server.js</code> prints the URL and <code>http://localhost:5000/health</code> shows <code>{"status":"ok"}</code> in the browser</li>
+</ul>
+<details class="hint"><summary>Stuck?</summary><div>Chapter 3 (first server) and Chapter 4 (index.js vs server.js).</div></details>
+
+<h2 id="phase2">Phase 2 — The database</h2>
+<p><strong>Goal:</strong> the tables are created automatically when the server starts.</p>
+<ul class="checklist" data-id="p2">
+  <li><code>db.js</code>: <code>dotenv.config()</code> FIRST, then <code>createPool</code> with the values from <code>process.env</code></li>
+  <li><code>db.js</code>: the three <code>CREATE TABLE IF NOT EXISTS</code> strings (USERS, TRIPS, REVIEWS), exported with <code>db</code></li>
+  <li><code>server.js</code>: an <code>async function startServer()</code> that awaits the three queries (USERS, TRIPS, then REVIEWS), then calls <code>listen</code>; <code>catch</code> prints the error</li>
+  <li><strong>Done when:</strong> the terminal prints the three “table created” lines, and Workbench shows the 3 tables (refresh the Schemas panel)</li>
+  <li>Added a few trips in Workbench with <code>INSERT INTO TRIPS …</code> to test with</li>
+</ul>
+<details class="hint"><summary>Stuck?</summary><div>Chapter 5 (db.js, server.js, the connection errors list), Chapter 6 (CREATE TABLE), Chapter 8 (REVIEWS table and the order).</div></details>
+
+<h2 id="phase3">Phase 3 — Users CRUD</h2>
+<p><strong>Goal:</strong> five working user endpoints.</p>
+<table>
+  <thead><tr><th>Route</th><th>Controller</th><th>Status codes</th></tr></thead>
+  <tbody>
+    <tr><td><code>GET /users</code></td><td>retrieveAllUsers</td><td>200, 500</td></tr>
+    <tr><td><code>GET /users/:id</code></td><td>retrieveUserById</td><td>200, 400, 404, 500</td></tr>
+    <tr><td><code>POST /users</code></td><td>createUser (hash the password!)</td><td>201, 400, 409, 500</td></tr>
+    <tr><td><code>PUT /users/:id</code></td><td>updateUserById (partial: <code>new || old</code>)</td><td>200, 400, 404, 500</td></tr>
+    <tr><td><code>DELETE /users/:id</code></td><td>deleteUserById (<code>affectedRows</code>)</td><td>200, 400, 404, 500</td></tr>
+  </tbody>
+</table>
+<ul class="checklist" data-id="p3">
+  <li>Controller written and exported; router written and exported; <code>app.use('/users', userRouter)</code></li>
+  <li>Every SQL value uses <code>?</code> — no <code>${}</code> inside SQL</li>
+  <li>No response contains the PASSWORD column (select the columns you want)</li>
+  <li><strong>Done when:</strong> all 5 work in Postman, including the error cases (bad id, missing fields, unknown id)</li>
+</ul>
+<details class="hint"><summary>Stuck?</summary><div>Chapter 4 (routes/controllers), Chapter 5 (db.query patterns), Chapter 7 (placeholders, createUser bugs), Chapter 1 section 9 (the <code>||</code> fallback for partial update).</div></details>
+
+<h2 id="phase4">Phase 4 — Validation and auth</h2>
+<ul class="checklist" data-id="p4">
+  <li><code>utils/validators.js</code>: sanitizeInput, isValidEmail, isStrongPassword, validateRequired, validateEmail, validatePassword</li>
+  <li><code>authController.js</code>: registerUser (6 steps) and loginUser</li>
+  <li><code>authRoutes.js</code>: <code>POST /register</code>, <code>POST /login</code>; mounted at <code>/auth</code></li>
+  <li>createUser in the users controller also validates and hashes</li>
+  <li><strong>Done when:</strong> you can register, see a <code>$2b$…</code> hash in Workbench, log in (200), and fail to log in with a wrong password (401). Registering the same email twice gives 409.</li>
+</ul>
+<details class="hint"><summary>Stuck?</summary><div>Chapter 7, all of it.</div></details>
+
+<h2 id="phase5">Phase 5 — Trips</h2>
+<ul class="checklist" data-id="p5">
+  <li><code>GET /trips</code> and <code>GET /trips/:id</code> (with id validation)</li>
+  <li>(If your project needs it) <code>POST</code>, <code>PUT</code>, <code>DELETE</code> for trips — same patterns as users</li>
+  <li><strong>Done when:</strong> they work in Postman with the trips you added in Workbench</li>
+</ul>
+
+<h2 id="phase6">Phase 6 — Reviews and JOINs</h2>
+<ul class="checklist" data-id="p6">
+  <li><code>GET /trips/reviews</code> (INNER JOIN of 3 tables) and <code>GET /trips/ratings</code> (LEFT JOIN)</li>
+  <li><code>GET /users/managers</code> (self join)</li>
+  <li>All fixed paths are <strong>above</strong> <code>/:id</code> in their router</li>
+  <li>(Bonus) <code>POST /trips/:id/reviews</code> with 400 / 404 / 409</li>
+  <li><strong>Done when:</strong> the JOIN routes return names and destinations, not just ids</li>
+</ul>
+<details class="hint"><summary>Stuck?</summary><div>Chapter 8, Practices 8.1–8.6, and Chapter 4 “Route order matters”.</div></details>
+
+<h2 id="phase7">Phase 7 — Cookies</h2>
+<ul class="checklist" data-id="p7">
+  <li><code>retrieveTripById</code> sets the <code>lastViewedTrip</code> cookie</li>
+  <li><code>GET /trips/last-viewed</code> reads it (above <code>/:id</code>!)</li>
+  <li><strong>Done when:</strong> after viewing trip 2, <code>/trips/last-viewed</code> returns trip 2</li>
+</ul>
+
+<h2 id="phase8">Phase 8 — Test everything</h2>
+<p>Go through this list in Postman. If a request gives a different status, you've found a bug — good! Fix it.</p>
+<table>
+  <thead><tr><th>Request</th><th>Body</th><th>Expect</th></tr></thead>
+  <tbody>
+    <tr><td><code>POST /auth/register</code></td><td>good username, email, strong password</td><td>201</td></tr>
+    <tr><td><code>POST /auth/register</code></td><td>same email again</td><td>409</td></tr>
+    <tr><td><code>POST /auth/register</code></td><td>password <code>"abc"</code></td><td>400</td></tr>
+    <tr><td><code>POST /auth/register</code></td><td>email <code>"not-an-email"</code></td><td>400</td></tr>
+    <tr><td><code>POST /auth/login</code></td><td>correct email + password</td><td>200 (no password in response)</td></tr>
+    <tr><td><code>POST /auth/login</code></td><td>wrong password</td><td>401</td></tr>
+    <tr><td><code>GET /users</code></td><td>—</td><td>200</td></tr>
+    <tr><td><code>GET /users/abc</code></td><td>—</td><td>400</td></tr>
+    <tr><td><code>GET /users/99999</code></td><td>—</td><td>404</td></tr>
+    <tr><td><code>PUT /users/1</code></td><td><code>{ "username": "o'brien" }</code></td><td>200 (the apostrophe must not break it!)</td></tr>
+    <tr><td><code>PUT /users/1</code></td><td><code>{}</code></td><td>400</td></tr>
+    <tr><td><code>DELETE /users/99999</code></td><td>—</td><td>404</td></tr>
+    <tr><td><code>GET /users/managers</code></td><td>—</td><td>200 with Employee/Manager names</td></tr>
+    <tr><td><code>GET /trips/reviews</code></td><td>—</td><td>200 with destination, rating, username</td></tr>
+    <tr><td><code>GET /trips/2</code> then <code>GET /trips/last-viewed</code></td><td>—</td><td>200, trip 2</td></tr>
+  </tbody>
+</table>
+
+<h2 id="phase9">Phase 9 — Clean-up checklist</h2>
+<p>Teachers check these things. Go through your code one last time:</p>
+<ul class="checklist" data-id="p9">
+  <li>Every early <code>res.status(...)</code> has a <code>return</code> in front of it</li>
+  <li>Every <code>await db.query</code> is inside a <code>try</code> with a 500 in the <code>catch</code></li>
+  <li>Every <code>catch</code> has <code>console.error(error)</code> so you can debug</li>
+  <li>No <code>${}</code> inside SQL strings with user values — only <code>?</code></li>
+  <li>Fixed routes are above <code>/:id</code> in every router</li>
+  <li>The password (or its hash) never appears in a response</li>
+  <li>The same response shape everywhere (e.g. <code>message</code> + <code>data</code>)</li>
+  <li>No leftover test routes or random <code>console.log</code>s</li>
+  <li><code>.env</code> is NOT uploaded; <code>.env.example</code> IS</li>
+  <li>A short <code>README.md</code>: how to install (<code>npm install</code>), set up <code>.env</code>, and run (<code>node server.js</code>)</li>
+</ul>
+
+<h2 id="adapt">Adapt it to your own topic</h2>
+<p>Your final project will probably be about something else — books, events, products, courses… <strong>The structure stays exactly the same.</strong> Only the names change:</p>
+<table>
+  <thead><tr><th>Travel API</th><th>Your project</th></tr></thead>
+  <tbody>
+    <tr><td>USERS</td><td>Usually stays USERS (register/login)</td></tr>
+    <tr><td>TRIPS — the main thing</td><td>Your main thing (BOOKS, EVENTS, PRODUCTS…)</td></tr>
+    <tr><td>REVIEWS — links users and trips</td><td>Your linking table (LOANS, BOOKINGS, ORDERS, ENROLLMENTS…)</td></tr>
+    <tr><td>lastViewedTrip cookie</td><td>lastViewedBook, lastViewedEvent…</td></tr>
+  </tbody>
+</table>
+
+<div class="exercise planner" id="planner">
+  <span class="ex-tag">Project planner</span>
+  <p>Type your topic and this builds a starting plan: the tables and the list of endpoints. <strong>What you type stays in this browser only</strong> — nothing is uploaded, and it never appears on the website for others.</p>
+  <label for="p-thing">Your main thing (singular)</label>
+  <input id="p-thing" placeholder="e.g. book" value="book">
+  <label for="p-things">Plural (used in URLs)</label>
+  <input id="p-things" placeholder="e.g. books" value="books">
+  <label for="p-cols">Its columns (one per line, MySQL style — ID is added for you)</label>
+  <textarea id="p-cols">TITLE VARCHAR(200) NOT NULL
+AUTHOR VARCHAR(150) NOT NULL
+PRICE DECIMAL(10,2) NOT NULL</textarea>
+  <label for="p-rel">Linking thing between users and it (singular, optional)</label>
+  <input id="p-rel" placeholder="e.g. review, loan, booking" value="review">
+  <label for="p-rel-cols">Extra columns of the linking table (optional)</label>
+  <textarea id="p-rel-cols">RATING INT NOT NULL CHECK (RATING BETWEEN 1 AND 5)
+UNIQUE (USER_ID, BOOK_ID)</textarea>
+  <div id="planner-out"></div>
+</div>
+
+<div class="callout note"><span class="label">You're ready</span>
+<p>If you finished all phases on your own, you can build your final project. When you get the topic, use the planner, then follow the phases again with the new names. Good luck! 🚀</p></div>
+</main>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/javascript/javascript.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/sql/sql.min.js"></script>
+<script src="assets/app.js"></script>
+</body>
+</html>

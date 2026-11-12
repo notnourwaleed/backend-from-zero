@@ -1,0 +1,966 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Security and Login · Backend from Zero</title>
+<meta name="description" content="Keep secrets in .env, validate input, stop SQL injection, hash passwords with bcrypt, and build register and login.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=JetBrains+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.css">
+<link rel="stylesheet" href="assets/style.css">
+<script>try{var t=localStorage.getItem('bfz-theme');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body data-page="07-security.html">
+<main>
+<div class="kicker">Chapter 7 · course weeks 6–8</div>
+<h1>Security &amp; login</h1>
+<p class="lead">Your server is open to the whole internet, and some people will try to break it. Four habits protect you from most attacks. Then you'll build register and login.</p>
+
+<h2 id="rules">The four rules</h2>
+<ol>
+  <li><strong>Never upload secrets.</strong> Passwords and keys go in <code>.env</code>, and <code>.env</code> goes in <code>.gitignore</code>.</li>
+  <li><strong>Never trust input.</strong> Check (validate) and clean (sanitize) everything the client sends.</li>
+  <li><strong>Never glue input into SQL.</strong> Always use <code>?</code> placeholders.</li>
+  <li><strong>Never store plain passwords.</strong> Hash them with bcrypt.</li>
+</ol>
+
+<h2 id="env">Rule 1: .env (and the order mistake)</h2>
+<p>You met <code>.env</code> in Chapter 5. One mistake is very common: <code>dotenv.config()</code> must run <strong>before</strong> you use <code>process.env</code>. Before that line runs, the values are all <code>undefined</code>.</p>
+<div class="exercise">
+  <span class="ex-tag bug">Spot the bug 7.1</span>
+  <p>Run it and send <code>GET /trips</code>. The database refuses the connection. Why? Fix <code>db.js</code>.</p>
+  <div class="runner" id="ex-envbug" data-express data-db data-entry="server.js">
+<textarea data-file="db.js">
+const mysql = require('mysql2/promise');
+const dotenv = require('dotenv');
+
+const db = mysql.createPool({
+  host: 'localhost',
+  port: 3306,
+  user: process.env.DB_USER,
+  password: process.env.DB_PASSWORD,
+  database: process.env.DB_NAME
+});
+
+dotenv.config();
+
+module.exports = { db };
+</textarea>
+<textarea data-file=".env" data-readonly>
+HOSTNAME=localhost
+PORT=5000
+
+DB_USER=root
+DB_PASSWORD=my_secret_pw
+DB_NAME=travel_db
+</textarea>
+<textarea data-file="controllers/tripController.js" data-readonly>
+const { db } = require('../db');
+
+const retrieveAllTrips = async (req, res) => {
+  try {
+    const [trips] = await db.query('SELECT * FROM TRIPS');
+    return res.status(200).json({ status: 'success', results: trips.length, data: trips });
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({ message: 'Database error' });
+  }
+};
+
+module.exports = { retrieveAllTrips };
+</textarea>
+<textarea data-file="index.js" data-readonly>
+const express = require('express');
+const { retrieveAllTrips } = require('./controllers/tripController');
+
+const app = express();
+app.use(express.json());
+app.get('/trips', retrieveAllTrips);
+
+module.exports = { app };
+</textarea>
+<textarea data-file="server.js" data-readonly>
+const { app } = require('./index.js');
+const dotenv = require('dotenv');
+dotenv.config();
+
+app.listen(process.env.PORT, process.env.HOSTNAME, () => {
+  console.log(`Server is running at http://${process.env.HOSTNAME}:${process.env.PORT}`);
+});
+</textarea>
+<script type="text/plain" class="tests">
+_test('GET /trips → 200', async () => _eq((await _req('GET', '/trips')).status, 200, 'status'));
+</script>
+<script type="text/plain" class="tries">
+GET /trips
+</script>
+<script type="text/plain" class="solution" data-file="db.js">
+const mysql = require('mysql2/promise');
+const dotenv = require('dotenv');
+dotenv.config();               // FIRST load .env…
+
+const db = mysql.createPool({  // …THEN use process.env
+  host: 'localhost',
+  port: 3306,
+  user: process.env.DB_USER,
+  password: process.env.DB_PASSWORD,
+  database: process.env.DB_NAME
+});
+
+module.exports = { db };
+</script>
+  </div>
+  <details class="hint"><summary>Hint</summary><div>The error says “Access denied for user ''”. The user is empty — so <code>process.env.DB_USER</code> was <code>undefined</code> at the moment <code>createPool</code> ran. Look at the order of the lines.</div></details>
+</div>
+
+<h2 id="validation">Rule 2: validate and sanitize</h2>
+<p><strong>Validate</strong> = check that the data is acceptable (present, right format). If not → <code>400</code>.<br>
+<strong>Sanitize</strong> = clean it up (remove spaces around it, make email lowercase), so <code>" Sara@Mail.com "</code> and <code>"sara@mail.com"</code> are treated as the same.</p>
+<p>The course puts these helpers in <code>utils/validators.js</code>, so every controller can reuse them.</p>
+
+<div class="exercise">
+  <span class="ex-tag">Practice 7.2</span>
+  <h4>Write the first two validators</h4>
+  <div class="runner" id="ex-validators1">
+<textarea data-file="main.js">
+// sanitizeInput(value):
+//   - if value is not a string → return ''   (typeof value !== 'string')
+//   - otherwise → remove spaces at both ends (.trim()) and make it lowercase (.toLowerCase())
+const sanitizeInput = (value) => {
+
+};
+
+// validateRequired(fields, requiredKeys):
+//   - loop over requiredKeys (for...of)
+//   - if fields[key] is not a string, OR it's empty after trim → return `${key} is required`
+//   - if the loop finishes → return null (no error)
+const validateRequired = (fields, requiredKeys) => {
+
+};
+
+console.log(sanitizeInput('  Sara@Mail.COM '));                          // sara@mail.com
+console.log(validateRequired({ username: 'sara', email: '' }, ['username', 'email']));  // email is required
+console.log(validateRequired({ username: 'sara', email: 'a@b.c' }, ['username', 'email'])); // null
+</textarea>
+<script type="text/plain" class="tests">
+_test('sanitizeInput("  Sara@Mail.COM ") → "sara@mail.com"', () => _eq(sanitizeInput('  Sara@Mail.COM '), 'sara@mail.com'));
+_test('sanitizeInput(undefined) → ""', () => _eq(sanitizeInput(undefined), ''));
+_test('sanitizeInput(42) → ""', () => _eq(sanitizeInput(42), ''));
+_test('missing email → "email is required"', () => _eq(validateRequired({ username: 'sara' }, ['username', 'email']), 'email is required'));
+_test('only spaces → "username is required"', () => _eq(validateRequired({ username: '   ', email: 'x' }, ['username', 'email']), 'username is required'));
+_test('all present → null', () => _eq(validateRequired({ username: 'sara', email: 'x' }, ['username', 'email']), null));
+</script>
+<script type="text/plain" class="solution">
+const sanitizeInput = (value) => {
+  if (typeof value !== 'string') return '';
+  return value.trim().toLowerCase();
+};
+
+const validateRequired = (fields, requiredKeys) => {
+  for (const key of requiredKeys) {
+    if (typeof fields[key] !== 'string' || !fields[key].trim()) {
+      return `${key} is required`;
+    }
+  }
+  return null;
+};
+
+console.log(sanitizeInput('  Sara@Mail.COM '));
+console.log(validateRequired({ username: 'sara', email: '' }, ['username', 'email']));
+console.log(validateRequired({ username: 'sara', email: 'a@b.c' }, ['username', 'email']));
+</script>
+  </div>
+</div>
+
+<h3>Checking formats with regular expressions</h3>
+<p>A <strong>regular expression</strong> (regex) is a pattern for text. You don't need to write them from scratch — but you should be able to read the two from the course:</p>
+<pre><code class="language-javascript">const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+emailRegex.test('sara@mail.com');  // true
+emailRegex.test('sara@mail');      // false</code></pre>
+<table>
+  <thead><tr><th>Piece</th><th>Meaning</th></tr></thead>
+  <tbody>
+    <tr><td><code>^</code> … <code>$</code></td><td>from the very start to the very end</td></tr>
+    <tr><td><code>[^\s@]+</code></td><td>one or more characters that are NOT a space and NOT @</td></tr>
+    <tr><td><code>@</code>, <code>\.</code></td><td>a real @, a real dot</td></tr>
+  </tbody>
+</table>
+<p>So: “something, @, something, dot, something”.</p>
+<pre><code class="language-javascript">const passRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[\W_]).{8,}$/;</code></pre>
+<table>
+  <thead><tr><th>Piece</th><th>Meaning</th></tr></thead>
+  <tbody>
+    <tr><td><code>(?=.*[a-z])</code></td><td>somewhere there's a lowercase letter</td></tr>
+    <tr><td><code>(?=.*[A-Z])</code></td><td>…an uppercase letter</td></tr>
+    <tr><td><code>(?=.*\d)</code></td><td>…a digit</td></tr>
+    <tr><td><code>(?=.*[\W_])</code></td><td>…a special character (like ! or _)</td></tr>
+    <tr><td><code>.{8,}</code></td><td>at least 8 characters in total</td></tr>
+  </tbody>
+</table>
+
+<div class="exercise">
+  <span class="ex-tag">Practice 7.3</span>
+  <div class="runner" id="ex-validators2">
+<textarea data-file="main.js">
+const isValidEmail = (email) => {
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  return typeof email === 'string' && emailRegex.test(email);
+};
+
+const isStrongPassword = (password) => {
+  if (typeof password !== 'string') return false;
+  const passRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[\W_]).{8,}$/;
+  return passRegex.test(password);
+};
+
+// TODO: validateEmail(email)
+//   missing          → 'Email is required'
+//   not a valid email → 'Invalid email format'
+//   ok               → null
+const validateEmail = (email) => {
+
+};
+
+// TODO: validatePassword(password)
+//   missing  → 'Password is required'
+//   not strong → 'Password must have 8+ chars, upper, lower, number, and special char'
+//   ok       → null
+const validatePassword = (password) => {
+
+};
+
+console.log(validateEmail('sara@mail'));       // Invalid email format
+console.log(validatePassword('hello'));        // Password must have ...
+console.log(validatePassword('Hello123!'));    // null
+</textarea>
+<script type="text/plain" class="tests">
+_test('validateEmail() → "Email is required"', () => _eq(validateEmail(), 'Email is required'));
+_test('validateEmail("sara@mail") → "Invalid email format"', () => _eq(validateEmail('sara@mail'), 'Invalid email format'));
+_test('validateEmail("sara@mail.com") → null', () => _eq(validateEmail('sara@mail.com'), null));
+_test('validatePassword("") → "Password is required"', () => _eq(validatePassword(''), 'Password is required'));
+_test('validatePassword("hello") → the long message', () => _eq(validatePassword('hello'), 'Password must have 8+ chars, upper, lower, number, and special char'));
+_test('validatePassword("Hello123!") → null', () => _eq(validatePassword('Hello123!'), null));
+</script>
+<script type="text/plain" class="solution">
+const isValidEmail = (email) => {
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  return typeof email === 'string' && emailRegex.test(email);
+};
+
+const isStrongPassword = (password) => {
+  if (typeof password !== 'string') return false;
+  const passRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[\W_]).{8,}$/;
+  return passRegex.test(password);
+};
+
+const validateEmail = (email) => {
+  if (!email) return 'Email is required';
+  if (!isValidEmail(email)) return 'Invalid email format';
+  return null;
+};
+
+const validatePassword = (password) => {
+  if (!password) return 'Password is required';
+  if (!isStrongPassword(password)) {
+    return 'Password must have 8+ chars, upper, lower, number, and special char';
+  }
+  return null;
+};
+
+console.log(validateEmail('sara@mail'));
+console.log(validatePassword('hello'));
+console.log(validatePassword('Hello123!'));
+</script>
+  </div>
+</div>
+<p>Notice the pattern: each validator returns <strong>an error message</strong> or <strong><code>null</code></strong> (= no problem). In the controller you then write:</p>
+<pre><code class="language-javascript">const emailError = validateEmail(cleanEmail);
+if (emailError) {
+  return res.status(400).json({ message: emailError });
+}</code></pre>
+
+<h2 id="injection">Rule 3: SQL injection</h2>
+<p>If you build SQL by gluing text together, the user's text becomes <strong>part of your SQL command</strong>. A clever user can then write SQL instead of a name.</p>
+<pre><code class="language-javascript">// The code:
+const query = `UPDATE USERS SET USERNAME = '${newUsername}' WHERE ID = ${id}`;
+
+// A normal user sends: omar2
+//   UPDATE USERS SET USERNAME = 'omar2' WHERE ID = 2                       ✓ fine
+
+// An attacker sends:  hacker', ROLE = 'admin
+//   UPDATE USERS SET USERNAME = 'hacker', ROLE = 'admin' WHERE ID = 2      ✗ now they're admin!</code></pre>
+<p>The quote <code>'</code> in their text <strong>closed your string</strong>, and everything after it is SQL. With a placeholder, MySQL knows the value is <em>only data</em> — quotes and all:</p>
+<pre><code class="language-javascript">await db.query('UPDATE USERS SET USERNAME = ? WHERE ID = ?', [newUsername, id]);
+// the username becomes literally:  hacker', ROLE = 'admin   — harmless text</code></pre>
+
+<div class="exercise">
+  <span class="ex-tag bug">Hack it, then fix it 7.4</span>
+  <ol>
+    <li>Press Run. Click the chips in order: check user 3 → send the attack → check user 3 again. Lina became an <strong>admin</strong>.</li>
+    <li>Also try the name <code>o'brien</code> — a totally normal name that crashes the vulnerable code.</li>
+    <li>Fix the <code>UPDATE</code> in the controller using <code>?</code> placeholders. Run again and repeat the attack.</li>
+  </ol>
+  <div class="runner" id="ex-injection" data-express data-db data-entry="server.js">
+<textarea data-file="controllers/userController.js" data-todo>
+const { db } = require('../db');
+
+const retrieveUserById = async (req, res) => {
+  const id = Number(req.params.id);
+  try {
+    const [users] = await db.query('SELECT ID, USERNAME, EMAIL, ROLE FROM USERS WHERE ID = ?', [id]);
+    if (users.length === 0) return res.status(404).json({ message: 'User not found' });
+    return res.status(200).json({ data: users[0] });
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({ message: 'Database error' });
+  }
+};
+
+const updateUserById = async (req, res) => {
+  const id = Number(req.params.id);
+  const { username, email } = req.body;
+
+  if (!username && !email) {
+    return res.status(400).json({ message: 'Please provide at least one field to update.' });
+  }
+
+  try {
+    const [users] = await db.query('SELECT * FROM USERS WHERE ID = ?', [id]);
+    if (users.length === 0) return res.status(404).json({ message: 'User not found' });
+
+    const newUsername = username || users[0].USERNAME;
+    const newEmail = email || users[0].EMAIL;
+
+    // ❌ DANGER: the user's text is glued into the SQL
+    const query = `UPDATE USERS SET USERNAME = '${newUsername}', EMAIL = '${newEmail}' WHERE ID = ${id}`;
+    await db.query(query);
+
+    const [updated] = await db.query('SELECT ID, USERNAME, EMAIL, ROLE FROM USERS WHERE ID = ?', [id]);
+    return res.status(200).json({ message: 'User updated successfully', data: updated[0] });
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({ message: 'Database error' });
+  }
+};
+
+module.exports = { retrieveUserById, updateUserById };
+</textarea>
+<textarea data-file="routes/userRoutes.js" data-readonly>
+const express = require('express');
+const { retrieveUserById, updateUserById } = require('../controllers/userController');
+
+const userRouter = express.Router();
+
+userRouter.get('/:id', retrieveUserById);
+userRouter.put('/:id', updateUserById);
+
+module.exports = userRouter;
+</textarea>
+<textarea data-file="db.js" data-readonly>
+const mysql = require('mysql2/promise');
+const dotenv = require('dotenv');
+dotenv.config();
+
+const db = mysql.createPool({
+  host: 'localhost',
+  port: 3306,
+  user: process.env.DB_USER,
+  password: process.env.DB_PASSWORD,
+  database: process.env.DB_NAME
+});
+
+module.exports = { db };
+</textarea>
+<textarea data-file="server.js" data-readonly>
+const express = require('express');
+const userRouter = require('./routes/userRoutes');
+
+const app = express();
+app.use(express.json());
+app.use('/users', userRouter);
+
+app.listen(5000, () => console.log('Server is running on port 5000'));
+</textarea>
+<script type="text/plain" class="tests">
+_test('a normal update still works', async () => { const r = await _req('PUT', '/users/2', { email: 'omar2@mail.com' }); _eq(r.status, 200, 'status'); return _eq(_db('SELECT EMAIL FROM USERS WHERE ID = 2')[0].EMAIL, 'omar2@mail.com', 'EMAIL in database'); });
+_test('the attack does NOT make user 3 an admin', async () => { await _req('PUT', '/users/3', { username: "hacker', ROLE = 'admin" }); return _eq(_db('SELECT ROLE FROM USERS WHERE ID = 3')[0].ROLE, 'user', 'ROLE of user 3'); });
+_test("the name o'brien is saved correctly", async () => { const r = await _req('PUT', '/users/4', { username: "o'brien" }); _eq(r.status, 200, 'status'); return _eq(_db('SELECT USERNAME FROM USERS WHERE ID = 4')[0].USERNAME, "o'brien", 'USERNAME'); });
+</script>
+<script type="text/plain" class="tries">
+GET /users/3
+PUT /users/3 {"username": "hacker', ROLE = 'admin"}
+GET /users/3
+PUT /users/4 {"username": "o'brien"}
+</script>
+<script type="text/plain" class="solution" data-file="controllers/userController.js">
+const { db } = require('../db');
+
+const retrieveUserById = async (req, res) => {
+  const id = Number(req.params.id);
+  try {
+    const [users] = await db.query('SELECT ID, USERNAME, EMAIL, ROLE FROM USERS WHERE ID = ?', [id]);
+    if (users.length === 0) return res.status(404).json({ message: 'User not found' });
+    return res.status(200).json({ data: users[0] });
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({ message: 'Database error' });
+  }
+};
+
+const updateUserById = async (req, res) => {
+  const id = Number(req.params.id);
+  const { username, email } = req.body;
+
+  if (!username && !email) {
+    return res.status(400).json({ message: 'Please provide at least one field to update.' });
+  }
+
+  try {
+    const [users] = await db.query('SELECT * FROM USERS WHERE ID = ?', [id]);
+    if (users.length === 0) return res.status(404).json({ message: 'User not found' });
+
+    const newUsername = username || users[0].USERNAME;
+    const newEmail = email || users[0].EMAIL;
+
+    // ✅ SAFE: placeholders
+    await db.query(
+      'UPDATE USERS SET USERNAME = ?, EMAIL = ? WHERE ID = ?',
+      [newUsername, newEmail, id]
+    );
+
+    const [updated] = await db.query('SELECT ID, USERNAME, EMAIL, ROLE FROM USERS WHERE ID = ?', [id]);
+    return res.status(200).json({ message: 'User updated successfully', data: updated[0] });
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({ message: 'Database error' });
+  }
+};
+
+module.exports = { retrieveUserById, updateUserById };
+</script>
+  </div>
+</div>
+<div class="callout warn"><span class="label">This is in the course code too</span>
+<p>The week 8 <code>updateUserById</code> and <code>deleteUserById</code> build SQL with <code>${...}</code>. The <code>Number(id)</code> makes the id part harmless, but the username/email/password/role parts in update are exactly this attack. In your project: <strong>a <code>?</code> for every value, every time.</strong></p></div>
+
+<h2 id="bcrypt">Rule 4: hash passwords with bcrypt</h2>
+<p>If your database is ever stolen, plain passwords would let the thief log in as everyone — and on other websites too, since people reuse passwords.</p>
+<div class="callout analogy"><span class="label">A smoothie</span>
+<p><strong>Hashing</strong> is like a blender: you can turn fruit into a smoothie, but never turn the smoothie back into fruit. bcrypt turns <code>Hello123!</code> into something like <code>$2b$12$Kq3h…</code>. To check a login, you blend the typed password the same way and compare the smoothies.</p></div>
+<pre><code class="language-bash">npm install bcrypt</code></pre>
+<pre><code class="language-javascript">const bcrypt = require('bcrypt');
+
+// Register: hash before saving (12 = "salt rounds": how much work. Higher = slower = safer)
+const hashedPassword = await bcrypt.hash(password, 12);
+// save hashedPassword in the PASSWORD column
+
+// Login: compare the typed password with the saved hash
+const isMatch = await bcrypt.compare(typedPassword, user.PASSWORD);  // true or false</code></pre>
+<ul>
+  <li>Hashing the same password twice gives <strong>different</strong> results (bcrypt adds random “salt”). That's why you can't compare with <code>===</code> — always use <code>bcrypt.compare</code>.</li>
+  <li>Both are async → <code>await</code>.</li>
+  <li>Don't <code>trim()</code> or lowercase passwords — spaces and capitals are part of the password.</li>
+  <li><strong>Never send the PASSWORD column back to the client</strong>, not even the hash. Select only the columns you need.</li>
+</ul>
+<div class="callout note"><span class="label">Playground note</span><p>The playground uses a fake bcrypt with the same functions, so your code works the same way. The real bcrypt is slower on purpose.</p></div>
+
+<h2 id="register">Build register</h2>
+<p>Register is a recipe of 6 steps. The course writes them as numbered comments — do the same in your project:</p>
+<ol>
+  <li><strong>Clean</strong> the input (sanitize username and email — not the password).</li>
+  <li><strong>Check required</strong> fields → 400.</li>
+  <li><strong>Validate email</strong> → 400.</li>
+  <li><strong>Validate password</strong> → 400.</li>
+  <li><strong>Hash</strong> the password.</li>
+  <li><strong>INSERT</strong> with placeholders → 201. If MySQL says the email already exists (<code>error.code === 'ER_DUP_ENTRY'</code>, thanks to <code>UNIQUE</code>) → 409.</li>
+</ol>
+
+<div class="exercise">
+  <span class="ex-tag">Practice 7.5</span>
+  <h4>registerUser</h4>
+  <p>The validators are ready in <code>utils/validators.js</code> (🔒, the course version). Write the controller. The database already has <code>sara@mail.com</code>.</p>
+  <div class="runner" id="ex-register" data-express data-db data-entry="server.js">
+<textarea data-file="controllers/authController.js" data-todo>
+const bcrypt = require('bcrypt');
+const { db } = require('../db');
+const {
+  sanitizeInput,
+  validateRequired,
+  validateEmail,
+  validatePassword
+} = require('../utils/validators');
+
+const registerUser = async (req, res) => {
+  const { username, email, password } = req.body;
+
+  // 1. Clean input (cleanUsername, cleanEmail). Do NOT clean the password.
+
+  // 2. Check required fields with validateRequired → 400 { message: requiredError }
+
+  // 3. Validate email → 400 { message: emailError }
+
+  // 4. Validate password → 400 { message: passwordError }
+
+  // 5 + 6. In try: hash the password (12 rounds), then
+  //   INSERT INTO USERS (USERNAME, EMAIL, PASSWORD, ROLE) VALUES (?, ?, ?, ?)   with role 'user'
+  //   → 201 { message: 'User registered successfully' }
+  // In catch:
+  //   error.code === 'ER_DUP_ENTRY' → 409 { message: 'Email already exists' }
+  //   otherwise → 500 { message: 'Registration error' }
+
+};
+
+module.exports = { registerUser };
+</textarea>
+<textarea data-file="utils/validators.js" data-readonly>
+const sanitizeInput = (value) => {
+  if (typeof value !== 'string') return '';
+  return value.trim().toLowerCase();
+};
+
+const isValidEmail = (email) => {
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  return typeof email === 'string' && emailRegex.test(email);
+};
+
+const isStrongPassword = (password) => {
+  if (typeof password !== 'string') return false;
+  const passRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[\W_]).{8,}$/;
+  return passRegex.test(password);
+};
+
+const validateRequired = (fields, requiredKeys) => {
+  for (const key of requiredKeys) {
+    if (typeof fields[key] !== 'string' || !fields[key].trim()) {
+      return `${key} is required`;
+    }
+  }
+  return null;
+};
+
+const validateEmail = (email) => {
+  if (!email) return 'Email is required';
+  if (!isValidEmail(email)) return 'Invalid email format';
+  return null;
+};
+
+const validatePassword = (password) => {
+  if (!password) return 'Password is required';
+  if (!isStrongPassword(password)) {
+    return 'Password must have 8+ chars, upper, lower, number, and special char';
+  }
+  return null;
+};
+
+module.exports = {
+  sanitizeInput,
+  isValidEmail,
+  isStrongPassword,
+  validateRequired,
+  validateEmail,
+  validatePassword
+};
+</textarea>
+<textarea data-file="routes/authRoutes.js" data-readonly>
+const express = require('express');
+const { registerUser } = require('../controllers/authController');
+
+const authRouter = express.Router();
+
+authRouter.post('/register', registerUser);
+
+module.exports = authRouter;
+</textarea>
+<textarea data-file="db.js" data-readonly>
+const mysql = require('mysql2/promise');
+const dotenv = require('dotenv');
+dotenv.config();
+
+const db = mysql.createPool({
+  host: 'localhost',
+  port: 3306,
+  user: process.env.DB_USER,
+  password: process.env.DB_PASSWORD,
+  database: process.env.DB_NAME
+});
+
+module.exports = { db };
+</textarea>
+<textarea data-file="server.js" data-readonly>
+const express = require('express');
+const authRouter = require('./routes/authRoutes');
+
+const app = express();
+app.use(express.json());
+app.use('/auth', authRouter);
+
+app.listen(5000, () => console.log('Server is running on port 5000'));
+</textarea>
+<script type="text/plain" class="tests">
+_test('missing email → 400 "email is required"', async () => { const r = await _req('POST', '/auth/register', { username: 'mona', password: 'Hello123!' }); _eq(r.status, 400, 'status'); return _eq(r.body.message, 'email is required', 'message'); });
+_test('bad email → 400 "Invalid email format"', async () => { const r = await _req('POST', '/auth/register', { username: 'mona', email: 'mona@mail', password: 'Hello123!' }); _eq(r.status, 400, 'status'); return _eq(r.body.message, 'Invalid email format', 'message'); });
+_test('weak password → 400', async () => _eq((await _req('POST', '/auth/register', { username: 'mona', email: 'mona@mail.com', password: 'hello' })).status, 400, 'status'));
+_test('good data → 201', async () => _eq((await _req('POST', '/auth/register', { username: 'Mona', email: ' Mona@Mail.com ', password: 'Hello123!' })).status, 201, 'status'));
+_test('saved with a clean email and a HASHED password', async () => { const rows = _db("SELECT * FROM USERS WHERE EMAIL = 'mona@mail.com'"); if (!rows.length) return 'no user with email mona@mail.com in the database (did you sanitize the email?)'; return (rows[0].PASSWORD !== 'Hello123!' && rows[0].PASSWORD.startsWith('$2')) || 'the password was saved as plain text!'; });
+_test('existing email → 409', async () => _eq((await _req('POST', '/auth/register', { username: 'sara2', email: 'sara@mail.com', password: 'Hello123!' })).status, 409, 'status'));
+</script>
+<script type="text/plain" class="tries">
+POST /auth/register {"username": "Mona", "email": " Mona@Mail.com ", "password": "Hello123!"}
+POST /auth/register {"username": "mona", "email": "mona@mail", "password": "Hello123!"}
+POST /auth/register {"username": "x", "email": "sara@mail.com", "password": "Hello123!"}
+</script>
+<script type="text/plain" class="solution" data-file="controllers/authController.js">
+const bcrypt = require('bcrypt');
+const { db } = require('../db');
+const {
+  sanitizeInput,
+  validateRequired,
+  validateEmail,
+  validatePassword
+} = require('../utils/validators');
+
+const registerUser = async (req, res) => {
+  const { username, email, password } = req.body;
+
+  // 1. Clean input
+  const cleanUsername = sanitizeInput(username);
+  const cleanEmail = sanitizeInput(email);
+
+  // 2. Check required fields
+  const requiredError = validateRequired(
+    { username: cleanUsername, email: cleanEmail, password },
+    ['username', 'email', 'password']
+  );
+  if (requiredError) {
+    return res.status(400).json({ message: requiredError });
+  }
+
+  // 3. Validate email
+  const emailError = validateEmail(cleanEmail);
+  if (emailError) {
+    return res.status(400).json({ message: emailError });
+  }
+
+  // 4. Validate password
+  const passwordError = validatePassword(password);
+  if (passwordError) {
+    return res.status(400).json({ message: passwordError });
+  }
+
+  try {
+    // 5. Hash
+    const hashedPassword = await bcrypt.hash(password, 12);
+
+    // 6. Insert with placeholders
+    await db.query(
+      'INSERT INTO USERS (USERNAME, EMAIL, PASSWORD, ROLE) VALUES (?, ?, ?, ?)',
+      [cleanUsername, cleanEmail, hashedPassword, 'user']
+    );
+
+    return res.status(201).json({ message: 'User registered successfully' });
+  } catch (error) {
+    if (error.code === 'ER_DUP_ENTRY') {
+      return res.status(409).json({ message: 'Email already exists' });
+    }
+    console.error(error);
+    return res.status(500).json({ message: 'Registration error' });
+  }
+};
+
+module.exports = { registerUser };
+</script>
+  </div>
+  <details class="hint"><summary>Hint 1 — steps 1 and 2</summary><div><code>const cleanEmail = sanitizeInput(email);</code> then <code>const requiredError = validateRequired({ username: cleanUsername, email: cleanEmail, password }, ['username', 'email', 'password']);</code></div></details>
+  <details class="hint"><summary>Hint 2 — steps 5 and 6</summary><div><code>const hashedPassword = await bcrypt.hash(password, 12);</code> then the INSERT with <code>[cleanUsername, cleanEmail, hashedPassword, 'user']</code>.</div></details>
+</div>
+
+<h2 id="login">Build login</h2>
+<ol>
+  <li>Clean the email. If email or password is missing → 400.</li>
+  <li><code>SELECT * FROM USERS WHERE EMAIL = ?</code>. No user → <strong>401</strong>.</li>
+  <li><code>bcrypt.compare(password, user.PASSWORD)</code>. No match → <strong>401</strong>.</li>
+  <li>→ 200 with the user's id, username, email, role (<strong>not</strong> the password).</li>
+</ol>
+<div class="callout tip"><span class="label">Why the same message for both 401s?</span>
+<p>Answer “Invalid email or password.” in both cases. If you said “email not found”, an attacker could find out who has an account.</p></div>
+
+<div class="exercise">
+  <span class="ex-tag">Practice 7.6</span>
+  <h4>loginUser</h4>
+  <p>All users in the practice database have the password <code>Password1!</code></p>
+  <div class="runner" id="ex-login" data-express data-db data-entry="server.js">
+<textarea data-file="controllers/authController.js" data-todo>
+const bcrypt = require('bcrypt');
+const { db } = require('../db');
+const { sanitizeInput } = require('../utils/validators');
+
+const loginUser = async (req, res) => {
+  const { email, password } = req.body;
+
+  // 1. cleanEmail; if cleanEmail or password missing → 400 { message: 'Please provide both email and password.' }
+
+  // 2. in try: SELECT * FROM USERS WHERE EMAIL = ?
+  //    no user → 401 { message: 'Invalid email or password.' }
+
+  // 3. const isMatch = await bcrypt.compare(password, user.PASSWORD)
+  //    no match → 401 { message: 'Invalid email or password.' }
+
+  // 4. → 200 { message: 'User logged in successfully', user: { id, username, email, role } }
+  //    (from user.ID, user.USERNAME, user.EMAIL, user.ROLE)
+
+  // catch → 500 { message: 'Login error' }
+
+};
+
+module.exports = { loginUser };
+</textarea>
+<textarea data-file="utils/validators.js" data-readonly>
+const sanitizeInput = (value) => {
+  if (typeof value !== 'string') return '';
+  return value.trim().toLowerCase();
+};
+
+module.exports = { sanitizeInput };
+</textarea>
+<textarea data-file="db.js" data-readonly>
+const mysql = require('mysql2/promise');
+const dotenv = require('dotenv');
+dotenv.config();
+
+const db = mysql.createPool({
+  host: 'localhost',
+  port: 3306,
+  user: process.env.DB_USER,
+  password: process.env.DB_PASSWORD,
+  database: process.env.DB_NAME
+});
+
+module.exports = { db };
+</textarea>
+<textarea data-file="server.js" data-readonly>
+const express = require('express');
+const { loginUser } = require('./controllers/authController');
+
+const app = express();
+app.use(express.json());
+
+const authRouter = express.Router();
+authRouter.post('/login', loginUser);
+app.use('/auth', authRouter);
+
+app.listen(5000, () => console.log('Server is running on port 5000'));
+</textarea>
+<script type="text/plain" class="tests">
+_test('no password → 400', async () => _eq((await _req('POST', '/auth/login', { email: 'sara@mail.com' })).status, 400, 'status'));
+_test('unknown email → 401', async () => _eq((await _req('POST', '/auth/login', { email: 'nobody@mail.com', password: 'Password1!' })).status, 401, 'status'));
+_test('wrong password → 401', async () => _eq((await _req('POST', '/auth/login', { email: 'sara@mail.com', password: 'wrong' })).status, 401, 'status'));
+_test('correct login → 200 with the user', async () => { const r = await _req('POST', '/auth/login', { email: 'SARA@mail.com', password: 'Password1!' }); _eq(r.status, 200, 'status'); return _eq(r.body.user, { id: 1, username: 'sara', email: 'sara@mail.com', role: 'admin' }, 'user'); });
+_test('the response never contains the password hash', async () => { const r = await _req('POST', '/auth/login', { email: 'sara@mail.com', password: 'Password1!' }); return !JSON.stringify(r.body).includes('$2b$') || 'the password hash is in the response!'; });
+</script>
+<script type="text/plain" class="tries">
+POST /auth/login {"email": "sara@mail.com", "password": "Password1!"}
+POST /auth/login {"email": "sara@mail.com", "password": "wrong"}
+POST /auth/login {"email": "nobody@mail.com", "password": "Password1!"}
+</script>
+<script type="text/plain" class="solution" data-file="controllers/authController.js">
+const bcrypt = require('bcrypt');
+const { db } = require('../db');
+const { sanitizeInput } = require('../utils/validators');
+
+const loginUser = async (req, res) => {
+  const { email, password } = req.body;
+
+  const cleanEmail = sanitizeInput(email);
+
+  if (!cleanEmail || !password) {
+    return res.status(400).json({ message: 'Please provide both email and password.' });
+  }
+
+  try {
+    const [users] = await db.query('SELECT * FROM USERS WHERE EMAIL = ?', [cleanEmail]);
+
+    if (users.length === 0) {
+      return res.status(401).json({ message: 'Invalid email or password.' });
+    }
+
+    const user = users[0];
+    const isMatch = await bcrypt.compare(password, user.PASSWORD);
+
+    if (!isMatch) {
+      return res.status(401).json({ message: 'Invalid email or password.' });
+    }
+
+    return res.status(200).json({
+      message: 'User logged in successfully',
+      user: {
+        id: user.ID,
+        username: user.USERNAME,
+        email: user.EMAIL,
+        role: user.ROLE
+      }
+    });
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({ message: 'Login error' });
+  }
+};
+
+module.exports = { loginUser };
+</script>
+  </div>
+</div>
+<div class="callout note"><span class="label">What login does NOT do (yet)</span>
+<p>Right now, login only <em>checks</em> the password. The server doesn't “remember” you for the next request — every request is a stranger. Remembering logged-in users needs sessions or tokens (like JWT), which usually come later in a course. Cookies (Chapter 8) are the first step.</p></div>
+
+<div class="exercise">
+  <span class="ex-tag bug">Spot the bugs 7.7</span>
+  <p>This <code>createUser</code> (for admins to add users) is close to the course's version. It has <strong>two</strong> problems: it crashes on every request, and when it works it leaks something it shouldn't.</p>
+  <div class="runner" id="ex-createuser" data-express data-db data-entry="server.js">
+<textarea data-file="controllers/userController.js">
+const { db } = require('../db');
+const bcrypt = require('bcrypt');
+
+const createUser = async (req, res) => {
+  const { username, email, password, role } = req.body;
+
+  if (!username || !email || !password || !role) {
+    return res.status(400).json({ message: 'Please provide all required fields' });
+  }
+
+  const passwordError = validatePassword(password);
+  if (passwordError) {
+    return res.status(400).json({ message: passwordError });
+  }
+
+  try {
+    const hashedPassword = await bcrypt.hash(password, 12);
+    const [result] = await db.query(
+      'INSERT INTO USERS (USERNAME, EMAIL, PASSWORD, ROLE) VALUES (?, ?, ?, ?)',
+      [username, email, hashedPassword, role]
+    );
+    const [newUser] = await db.query('SELECT * FROM USERS WHERE ID = ?', [result.insertId]);
+    return res.status(201).json({ message: 'User created successfully', data: newUser[0] });
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({ message: 'Database error' });
+  }
+};
+
+module.exports = { createUser };
+</textarea>
+<textarea data-file="utils/validators.js" data-readonly>
+const isStrongPassword = (password) => {
+  if (typeof password !== 'string') return false;
+  const passRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[\W_]).{8,}$/;
+  return passRegex.test(password);
+};
+
+const validatePassword = (password) => {
+  if (!password) return 'Password is required';
+  if (!isStrongPassword(password)) {
+    return 'Password must have 8+ chars, upper, lower, number, and special char';
+  }
+  return null;
+};
+
+module.exports = { validatePassword };
+</textarea>
+<textarea data-file="db.js" data-readonly>
+const mysql = require('mysql2/promise');
+const dotenv = require('dotenv');
+dotenv.config();
+
+const db = mysql.createPool({
+  host: 'localhost',
+  port: 3306,
+  user: process.env.DB_USER,
+  password: process.env.DB_PASSWORD,
+  database: process.env.DB_NAME
+});
+
+module.exports = { db };
+</textarea>
+<textarea data-file="server.js" data-readonly>
+const express = require('express');
+const { createUser } = require('./controllers/userController');
+
+const app = express();
+app.use(express.json());
+app.post('/users', createUser);
+
+app.listen(5000, () => console.log('Server is running on port 5000'));
+</textarea>
+<script type="text/plain" class="tests">
+_test('weak password → 400', async () => _eq((await _req('POST', '/users', { username: 'a', email: 'a@mail.com', password: 'weak', role: 'user' })).status, 400, 'status'));
+_test('valid user → 201', async () => _eq((await _req('POST', '/users', { username: 'nour', email: 'nour@mail.com', password: 'Hello123!', role: 'user' })).status, 201, 'status'));
+_test('the response does NOT include the PASSWORD column', async () => { const r = await _req('POST', '/users', { username: 'kim', email: 'kim@mail.com', password: 'Hello123!', role: 'user' }); _eq(r.status, 201, 'status'); return (r.body.data && r.body.data.PASSWORD === undefined && r.body.data.USERNAME === 'kim') || 'data should have USERNAME but no PASSWORD'; });
+</script>
+<script type="text/plain" class="tries">
+POST /users {"username": "nour", "email": "nour@mail.com", "password": "Hello123!", "role": "user"}
+POST /users {"username": "a", "email": "a@mail.com", "password": "weak", "role": "user"}
+</script>
+<script type="text/plain" class="solution" data-file="controllers/userController.js">
+const { db } = require('../db');
+const bcrypt = require('bcrypt');
+const { validatePassword } = require('../utils/validators');   // fix 1: import it!
+
+const createUser = async (req, res) => {
+  const { username, email, password, role } = req.body;
+
+  if (!username || !email || !password || !role) {
+    return res.status(400).json({ message: 'Please provide all required fields' });
+  }
+
+  const passwordError = validatePassword(password);
+  if (passwordError) {
+    return res.status(400).json({ message: passwordError });
+  }
+
+  try {
+    const hashedPassword = await bcrypt.hash(password, 12);
+    const [result] = await db.query(
+      'INSERT INTO USERS (USERNAME, EMAIL, PASSWORD, ROLE) VALUES (?, ?, ?, ?)',
+      [username, email, hashedPassword, role]
+    );
+    // fix 2: never send the password (hash) back — choose the columns
+    const [newUser] = await db.query(
+      'SELECT ID, USERNAME, EMAIL, ROLE FROM USERS WHERE ID = ?',
+      [result.insertId]
+    );
+    return res.status(201).json({ message: 'User created successfully', data: newUser[0] });
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({ message: 'Database error' });
+  }
+};
+
+module.exports = { createUser };
+</script>
+  </div>
+  <details class="hint"><summary>Hint 1</summary><div>“validatePassword is not defined” — the function exists in <code>utils/validators.js</code>, but this file never asked for it.</div></details>
+  <details class="hint"><summary>Hint 2</summary><div>Look at the response of a successful create. Which column should never leave the server? Replace <code>SELECT *</code> with the columns you want to send.</div></details>
+</div>
+
+<div class="exercise">
+  <span class="ex-tag pc">On your computer</span>
+  <ul class="checklist" data-id="ch7">
+    <li><code>.env</code> and <code>node_modules</code> are in <code>.gitignore</code>, and I made <code>.env.example</code></li>
+    <li>Ran <code>npm install bcrypt</code></li>
+    <li>Made <code>utils/validators.js</code> and exported all the helpers</li>
+    <li>Made <code>controllers/authController.js</code> with <code>registerUser</code> and <code>loginUser</code></li>
+    <li>Made <code>routes/authRoutes.js</code> and connected it with <code>app.use('/auth', authRouter)</code></li>
+    <li>Checked in Workbench that passwords in USERS look like <code>$2b$12$…</code></li>
+    <li>Searched my whole project for <code>${</code> inside SQL strings and replaced every one with <code>?</code></li>
+    <li>None of my responses send the PASSWORD column</li>
+  </ul>
+</div>
+</main>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/javascript/javascript.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/sql/sql.min.js"></script>
+<script src="assets/app.js"></script>
+</body>
+</html>

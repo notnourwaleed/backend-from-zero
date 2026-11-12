@@ -1,0 +1,221 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SQL Basics · Backend from Zero</title>
+<meta name="description" content="CREATE TABLE, SELECT, INSERT, UPDATE, DELETE, COUNT and GROUP BY — practised in a live SQL playground.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=JetBrains+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.css">
+<link rel="stylesheet" href="assets/style.css">
+<script>try{var t=localStorage.getItem('bfz-theme');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body data-page="06-sql.html">
+<main>
+<div class="kicker">Chapter 6</div>
+<h1>SQL basics</h1>
+<p class="lead">SQL is the language you use to talk to MySQL. You write it as text inside <code>db.query("...")</code>. Here you practise it directly on a real practice database.</p>
+
+<h2 id="tables">Tables, rows, columns</h2>
+<p>A database is a set of <strong>tables</strong>. A table is like a spreadsheet: <strong>columns</strong> are the kinds of information, <strong>rows</strong> are the items. Here's the <code>TRIPS</code> table from the practice database:</p>
+<table class="sql-table">
+  <thead><tr><th>ID</th><th>DESTINATION</th><th>COUNTRY</th><th>COST</th></tr></thead>
+  <tbody>
+    <tr><td>1</td><td>Paris</td><td>France</td><td>1200</td></tr>
+    <tr><td>2</td><td>Rome</td><td>Italy</td><td>950.5</td></tr>
+    <tr><td>3</td><td>Tokyo</td><td>Japan</td><td>2100</td></tr>
+    <tr><td>4</td><td>Cairo</td><td>Egypt</td><td>400</td></tr>
+    <tr><td>5</td><td>Venice</td><td>Italy</td><td>1100</td></tr>
+    <tr><td>6</td><td>Kyoto</td><td>Japan</td><td>1800</td></tr>
+    <tr><td>7</td><td>Barcelona</td><td>Spain</td><td>870</td></tr>
+  </tbody>
+</table>
+<p>There's also a <code>USERS</code> table (sara, omar, lina, youssef) and a <code>REVIEWS</code> table (Chapter 8).</p>
+
+<h2 id="create">CREATE TABLE, explained line by line</h2>
+<p>This is the USERS table from the course:</p>
+<pre><code class="language-sql">CREATE TABLE IF NOT EXISTS USERS (
+  ID INT AUTO_INCREMENT PRIMARY KEY,
+  USERNAME VARCHAR(255) NOT NULL,
+  EMAIL VARCHAR(255) UNIQUE NOT NULL,
+  PASSWORD VARCHAR(255) NOT NULL,
+  ROLE ENUM('admin', 'user') NOT NULL DEFAULT 'user',
+  MANAGER_ID INT NULL,
+  FOREIGN KEY (MANAGER_ID) REFERENCES USERS(ID)
+);</code></pre>
+<table>
+  <thead><tr><th>Piece</th><th>Meaning</th></tr></thead>
+  <tbody>
+    <tr><td><code>IF NOT EXISTS</code></td><td>Only create it if it isn't there yet (so restarting your server is safe)</td></tr>
+    <tr><td><code>INT</code></td><td>Whole number</td></tr>
+    <tr><td><code>VARCHAR(255)</code></td><td>Text, up to 255 characters</td></tr>
+    <tr><td><code>DECIMAL(10,2)</code></td><td>Exact number with 2 decimals — for money</td></tr>
+    <tr><td><code>ENUM('admin','user')</code></td><td>Only these values are allowed</td></tr>
+    <tr><td><code>PRIMARY KEY</code></td><td>The column that identifies each row. Never repeats.</td></tr>
+    <tr><td><code>AUTO_INCREMENT</code></td><td>MySQL picks the next number for you (1, 2, 3…) — you never send the ID</td></tr>
+    <tr><td><code>NOT NULL</code></td><td>Must have a value</td></tr>
+    <tr><td><code>UNIQUE</code></td><td>No two rows can have the same value (one account per email)</td></tr>
+    <tr><td><code>DEFAULT 'user'</code></td><td>If you don't send a value, use this one</td></tr>
+    <tr><td><code>FOREIGN KEY … REFERENCES</code></td><td>This column points at a row in another table (Chapter 8)</td></tr>
+  </tbody>
+</table>
+<div class="callout note"><span class="label">Uppercase?</span><p>SQL words (<code>SELECT</code>, <code>FROM</code>) work in any case. Writing them in UPPERCASE is a habit that makes queries easier to read. Your course writes table and column names in uppercase too, so that's what the rows' keys look like in JavaScript: <code>user.USERNAME</code>.</p></div>
+
+<h2 id="select">SELECT: reading data</h2>
+<pre><code class="language-sql">SELECT * FROM TRIPS;                          -- every column, every row
+SELECT DESTINATION, COST FROM TRIPS;          -- only some columns
+SELECT * FROM TRIPS WHERE COUNTRY = 'Italy';  -- only rows that match
+SELECT * FROM TRIPS WHERE COST &lt; 1000 AND COUNTRY = 'Italy';
+SELECT * FROM TRIPS ORDER BY COST DESC;       -- sort: ASC = small→big, DESC = big→small
+SELECT * FROM TRIPS LIMIT 3;                  -- only the first 3
+SELECT DESTINATION AS place FROM TRIPS;       -- rename a column in the result
+SELECT * FROM TRIPS WHERE DESTINATION LIKE 'K%';  -- starts with K  (% = "anything")</code></pre>
+<p>Text values go in <strong>single quotes</strong>: <code>'Italy'</code>. Numbers don't. Lines starting with <code>--</code> are comments.</p>
+
+<div class="exercise">
+  <span class="ex-tag">Playground</span>
+  <p>Try anything here. Run the examples above, change them, break them. Also try <code>SHOW TABLES;</code> and <code>DESCRIBE USERS;</code>.</p>
+  <div class="sqlbox" id="free">
+<textarea>
+SELECT * FROM TRIPS;
+</textarea>
+  </div>
+</div>
+
+<div class="exercise">
+  <span class="ex-tag">Practice 6.1</span>
+  <p>Get all trips in <strong>Japan</strong> (all columns).</p>
+  <div class="sqlbox" id="q-japan" data-solution="SELECT * FROM TRIPS WHERE COUNTRY = 'Japan';">
+<textarea>
+-- your query here
+</textarea>
+  </div>
+</div>
+
+<div class="exercise">
+  <span class="ex-tag">Practice 6.2</span>
+  <p>Get only the <strong>DESTINATION</strong> and <strong>COST</strong> of trips that cost <strong>less than 1000</strong>, sorted from <strong>cheapest to most expensive</strong>.</p>
+  <div class="sqlbox" id="q-cheap" data-solution="SELECT DESTINATION, COST FROM TRIPS WHERE COST &lt; 1000 ORDER BY COST ASC;">
+<textarea>
+-- your query here
+</textarea>
+  </div>
+  <details class="hint"><summary>Hint</summary><div>The order of the parts is always: <code>SELECT … FROM … WHERE … ORDER BY … LIMIT …</code></div></details>
+</div>
+
+<div class="exercise">
+  <span class="ex-tag">Practice 6.3</span>
+  <p>Get the <strong>USERNAME</strong> and <strong>EMAIL</strong> of every user whose role is <strong>admin</strong>.</p>
+  <div class="sqlbox" id="q-admins" data-solution="SELECT USERNAME, EMAIL FROM USERS WHERE ROLE = 'admin';">
+<textarea>
+-- your query here
+</textarea>
+  </div>
+</div>
+
+<div class="exercise">
+  <span class="ex-tag">Practice 6.4</span>
+  <p>Get the <strong>single most expensive</strong> trip (all columns).</p>
+  <div class="sqlbox" id="q-max" data-solution="SELECT * FROM TRIPS ORDER BY COST DESC LIMIT 1;">
+<textarea>
+-- your query here
+</textarea>
+  </div>
+  <details class="hint"><summary>Hint</summary><div>Sort big → small, then keep only 1.</div></details>
+</div>
+
+<h2 id="insert">INSERT: adding a row</h2>
+<pre><code class="language-sql">INSERT INTO TRIPS (DESTINATION, COUNTRY, COST)
+VALUES ('Lisbon', 'Portugal', 780);</code></pre>
+<p>List the columns, then the values in <strong>the same order</strong>. Don't send the <code>ID</code> — <code>AUTO_INCREMENT</code> picks it.</p>
+<p>In Node, the values are replaced by <code>?</code> placeholders and sent separately:</p>
+<pre><code class="language-javascript">await db.query(
+  'INSERT INTO TRIPS (DESTINATION, COUNTRY, COST) VALUES (?, ?, ?)',
+  [destination, country, cost]
+);</code></pre>
+
+<div class="exercise">
+  <span class="ex-tag">Practice 6.5</span>
+  <p>Add a trip to <strong>Athens</strong>, <strong>Greece</strong>, costing <strong>990</strong>. You'll see the whole table afterwards.</p>
+  <div class="sqlbox" id="q-insert" data-solution="INSERT INTO TRIPS (DESTINATION, COUNTRY, COST) VALUES ('Athens', 'Greece', 990);" data-check="SELECT * FROM TRIPS">
+<textarea>
+-- your INSERT here
+</textarea>
+  </div>
+</div>
+
+<h2 id="update">UPDATE: changing rows</h2>
+<pre><code class="language-sql">UPDATE TRIPS SET COST = 999 WHERE ID = 2;
+UPDATE USERS SET USERNAME = 'sara_k', ROLE = 'user' WHERE ID = 1;   -- several columns</code></pre>
+<div class="callout danger"><span class="label">Never forget WHERE</span>
+<p><code>UPDATE TRIPS SET COST = 0;</code> with no WHERE changes <strong>every single row</strong>. Same for DELETE. There's no undo button. Always write the WHERE first.</p></div>
+
+<div class="exercise">
+  <span class="ex-tag">Practice 6.6</span>
+  <p>Rome's price changed: set the cost of the trip with <strong>ID 2</strong> to <strong>999.99</strong>.</p>
+  <div class="sqlbox" id="q-update" data-solution="UPDATE TRIPS SET COST = 999.99 WHERE ID = 2;" data-check="SELECT * FROM TRIPS">
+<textarea>
+-- your UPDATE here
+</textarea>
+  </div>
+</div>
+
+<h2 id="delete">DELETE: removing rows</h2>
+<pre><code class="language-sql">DELETE FROM TRIPS WHERE ID = 7;</code></pre>
+
+<div class="exercise">
+  <span class="ex-tag">Practice 6.7</span>
+  <p>Delete the <strong>Barcelona</strong> trip — use its <strong>ID</strong> (look at the table at the top of the page).</p>
+  <div class="sqlbox" id="q-delete" data-solution="DELETE FROM TRIPS WHERE ID = 7;" data-check="SELECT * FROM TRIPS">
+<textarea>
+-- your DELETE here
+</textarea>
+  </div>
+  <div class="quiz">
+    <p class="q">What happens with <code>DELETE FROM TRIPS;</code> (no WHERE)?</p>
+    <div class="options">
+      <button data-why="MySQL doesn't stop you — it does what you asked.">MySQL gives an error</button>
+      <button data-correct>All trips are deleted</button>
+      <button data-why="There's nothing that picks 'the last one'.">The last trip is deleted</button>
+    </div>
+    <div class="explain">Every row is deleted. (In real MySQL Workbench, “safe update mode” may block it — but your Node code has no such protection.)</div>
+  </div>
+</div>
+
+<h2 id="count">Counting and grouping (bonus, very useful)</h2>
+<pre><code class="language-sql">SELECT COUNT(*) FROM TRIPS;                               -- how many rows: 7
+SELECT AVG(COST) FROM TRIPS;                              -- average
+SELECT COUNTRY, COUNT(*) AS trips FROM TRIPS GROUP BY COUNTRY;   -- one row per country</code></pre>
+<p><code>GROUP BY COUNTRY</code> puts all rows with the same country into one group, and <code>COUNT(*)</code> counts each group.</p>
+
+<div class="exercise">
+  <span class="ex-tag">Practice 6.8</span>
+  <p>For each <strong>COUNTRY</strong>, show the country and its <strong>average COST</strong>. (Two columns.)</p>
+  <div class="sqlbox" id="q-group" data-solution="SELECT COUNTRY, AVG(COST) FROM TRIPS GROUP BY COUNTRY;">
+<textarea>
+-- your query here
+</textarea>
+  </div>
+</div>
+
+<h2 id="placeholders">One more thing: ? placeholders</h2>
+<p>When SQL is in your Node code, the values usually come from the user (<code>req.body</code>, <code>req.params</code>). <strong>Never</strong> glue them into the SQL text yourself:</p>
+<pre><code class="language-javascript">// ❌ DANGEROUS — the user's text becomes part of your SQL
+db.query(`SELECT * FROM USERS WHERE EMAIL = '${email}'`);
+
+// ✅ SAFE — MySQL treats the value as data, never as SQL
+db.query('SELECT * FROM USERS WHERE EMAIL = ?', [email]);</code></pre>
+<p>Chapter 7 shows you exactly how an attacker breaks the first version. For now: <strong>values always go in <code>?</code></strong>.</p>
+
+<div class="callout note"><span class="label">About this playground</span>
+<p>The playground runs SQLite (a small database engine) inside your browser, set up to act like MySQL for everything in this course. If something works here but not in Workbench (or the other way round), trust Workbench.</p></div>
+</main>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/javascript/javascript.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/sql/sql.min.js"></script>
+<script src="assets/app.js"></script>
+</body>
+</html>
