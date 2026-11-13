@@ -571,6 +571,7 @@
       try { this.audio.pause(); } catch (e) { /* ignore */ }
       cancelAnimationFrame(this.raf);
       this.usingAudio = false;
+      if (this.avatar) this.avatar.classList.remove('speaking');
     }
     unspot() {
       $$('.tm-spot').forEach(e => e.classList.remove('tm-spot'));
@@ -583,13 +584,14 @@
       this.playing = !this.playing;
       this.playBtn.textContent = this.playing ? '⏸' : '▶';
       this.overlay.classList.toggle('paused', !this.playing);
+      this.avatar.classList.toggle('speaking', this.playing && this.usingAudio);
       if (!this.playing) {
         this.freezeTimers();
         if (this.usingAudio) this.audio.pause(); else { this.token++; if (synth) synth.cancel(); }
         cancelAnimationFrame(this.raf);
       } else {
         this.thawTimers();
-        if (this.usingAudio && !this.audio.ended) { this.audio.play().catch(() => {}); this.tick(); }
+        if (this.usingAudio && !this.audio.ended) { this.audio.play().then(() => { this.notice.hidden = true; this.avatar.classList.add('speaking'); this.tick(); }).catch(() => {}); }
         else if (this.waiting) { /* in a practice stop: nothing to resume */ }
         else this.restart();
       }
@@ -716,7 +718,7 @@
     // ---- glossary chips
     showTerms(text) {
       this.terms.innerHTML = '';
-      termsFor(text).forEach((g, i) => this.terms.append(h('button', { class: 'tm-term', style: { animationDelay: (i * 120) + 'ms' }, onclick: () => this.openTerm(g) }, h('span', null, g.term), h('i', null, '?'))));
+      termsFor(text).forEach((g, i) => this.terms.append(h('button', { class: 'tm-chip', style: { animationDelay: (i * 120) + 'ms' }, onclick: () => this.openTerm(g) }, h('span', null, g.term), h('i', null, '?'))));
     }
     openTerm(g) {
       this.termWasPlaying = this.playing;
@@ -833,6 +835,7 @@
         if (finished || token !== this.token) return;
         finished = true;
         this.usingAudio = false;
+        this.avatar.classList.remove('speaking');
         this.markWord(text.length + 1);
         this.setProgress(1);
         done();
@@ -847,7 +850,7 @@
         a.playbackRate = this.rate;
         a.onended = () => { if (token === this.token) finish(); };
         a.onerror = () => { if (token !== this.token) return; this.usingAudio = false; this.timeWords(0, text.length, dur * 0.95, token); this.after(dur, finish); };
-        a.play().then(() => this.tick()).catch(() => {
+        a.play().then(() => { this.notice.hidden = true; this.avatar.classList.add('speaking'); this.tick(); }).catch(() => {
           if (token !== this.token) return;
           // autoplay blocked: wait for the student to press play
           this.playing = false; this.playBtn.textContent = '▶'; this.overlay.classList.add('paused'); this.freezeTimers();
@@ -857,6 +860,7 @@
       }
       // 2) no recording: silent (muted) or the browser's voice
       if (this.muted || !synth) {
+        this.avatar.classList.add('speaking');
         this.timeWords(0, text.length, dur * 0.95, token);
         this.after(dur, finish);
         return;
@@ -873,7 +877,7 @@
         const u = new SpeechSynthesisUtterance(p.text.trim());
         u.rate = this.rate * 0.95;
         if (voice) { u.voice = voice; u.lang = voice.lang; } else u.lang = 'en-GB';
-        u.onstart = () => { if (token === this.token && !this.boundaryWorks) this.timeWords(p.start, p.start + p.text.length, estimateMs(p.text, this.rate) - 500, token); };
+        u.onstart = () => { if (token === this.token) this.avatar.classList.add('speaking'); if (token === this.token && !this.boundaryWorks) this.timeWords(p.start, p.start + p.text.length, estimateMs(p.text, this.rate) - 500, token); };
         u.onboundary = e => { if (token !== this.token || e.name === 'sentence') return; this.boundaryWorks = true; this.markWord(p.start + (p.text.length - p.text.trimStart().length) + e.charIndex); };
         u.onend = () => { k++; next(); };
         u.onerror = e => { if (e.error === 'interrupted' || e.error === 'canceled') return; k++; next(); };

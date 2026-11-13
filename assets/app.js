@@ -181,7 +181,12 @@
   function loadTeacher() {
     if (!teacherLoading) {
       document.head.append(h('link', { rel: 'stylesheet', href: 'assets/teacher.css' }));
-      teacherLoading = loadScript('assets/teacher-lessons.js').then(() => loadScript('assets/teacher.js'))
+      teacherLoading = Promise.all([
+        loadScript('assets/teacher-lessons.js'),
+        loadScript('assets/teacher-glossary.js'),
+        loadScript('assets/teacher-icons.js'),
+        loadScript('assets/audio/manifest.js').catch(() => { /* no recordings yet: browser voice */ }),
+      ]).then(() => loadScript('assets/teacher.js'))
         .catch(e => { teacherLoading = null; throw e; });
     }
     return teacherLoading;

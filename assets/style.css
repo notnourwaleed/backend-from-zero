@@ -461,6 +461,20 @@ body.mc-lock { overflow: hidden; }
 
 /* teacher cover: a small copy of the real player */
 .mc-teach { position: absolute; inset: 10px; display: flex; flex-direction: column; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; font-size: 11px; }
+/* the Teacher cover uses the player's real look: always dark, yellow captions */
+.mc-teach {
+  --surface: #0A0F13; --surface-2: #121A20; --border: #283741; --text: #E8EEF1; --muted: #9BAAB4;
+  --accent: #F08B3E; --accent-weak: #2A1A0E; --accent-text: #0A0F13;
+  --warn-weak: #16222A; --good-weak: #16222A; --purple-weak: #16222A;
+  color: #E8EEF1; background: radial-gradient(60% 50% at 50% 40%, rgba(240,139,62,.12), transparent 70%), #0A0F13;
+}
+.mc-teach .mc-node { border-radius: 50%; width: 46px; height: 46px; padding: 0; justify-content: center; margin: 0 auto; background: #16222A; }
+.mc-teach .mc-node span { position: absolute; margin-top: 64px; font-size: 9.5px; }
+.mc-teach .mc-node { position: relative; }
+.mc-teach .mc-t-stage { padding-bottom: 22px; }
+.mc-teach .mc-t-stage::before { content: ""; position: absolute; left: 15%; right: 15%; top: calc(50% - 11px); height: 2px; background: #3B4A55; }
+.mc-teach .mc-words span { animation-name: mc-word-hl; }
+@keyframes mc-word-hl { 0% { color: rgba(232,238,241,.45); } 10%, 100% { color: #F5C842; } }
 .mc-t-head { display: flex; gap: 6px; align-items: center; padding: 5px 8px; border-bottom: 1px solid var(--border); }
 .mc-pill { font-weight: 700; color: var(--accent); background: var(--accent-weak); border-radius: 999px; padding: 1px 7px; }
 .mc-t-title { flex: 1; color: var(--muted); }
