@@ -22,7 +22,9 @@ body.tm-lock { overflow: hidden; }
   background: var(--tm-bg); color: var(--tm-ink); font-family: var(--f-body);
   animation: tm-fade .3s ease;
 }
-.tm-panel { position: relative; width: 100%; height: 100vh; height: 100dvh; display: flex; flex-direction: column; overflow: hidden; }
+.tm-panel { position: relative; width: 100%; height: 100vh; height: 100dvh; display: flex; flex-direction: column; overflow: hidden; overflow: clip; }
+.tm-overlay { overflow: hidden; overflow: clip; }
+.tm-stage { overflow-x: hidden; }
 .tm-overlay::before { /* soft accent glow, like the network site's background */
   content: ""; position: absolute; inset: 0; pointer-events: none;
   background: radial-gradient(60% 50% at 50% 38%, color-mix(in srgb, var(--tm-accent) 9%, transparent), transparent 70%);
@@ -56,7 +58,7 @@ body.tm-lock { overflow: hidden; }
 /* the teacher's face */
 .tm-avatar { position: relative; flex: none; width: 64px; height: 64px; }
 .tm-face { display: block; width: 100%; height: 100%; border-radius: 50%; overflow: hidden; border: 3px solid var(--tm-accent); background: var(--tm-soft); box-shadow: 0 6px 18px rgba(0,0,0,.4); }
-.tm-face img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.tm-face img { width: 100%; height: 100%; object-fit: cover; object-position: 45% 48%; display: block; }
 .tm-face.drawn { display: grid; place-items: center; padding: 6px; }
 .tm-face.drawn svg { width: 100%; height: 100%; }
 .tm-avatar.speaking .tm-face { animation: tm-talk .32s ease-in-out infinite alternate; }
@@ -95,7 +97,7 @@ body.tm-lock { overflow: hidden; }
 /* start / end screens */
 .tm-overlay.idle .tm-controls, .tm-overlay.idle .tm-terms, .tm-overlay.idle .tm-avatar { display: none; }
 .tm-title-card { text-align: center; margin: auto; padding: 4vh 10px; }
-.tm-title-card h2 { font-family: var(--f-display); font-weight: 800; font-stretch: 108%; font-size: clamp(2rem, 5vw, 3.4rem); line-height: 1.05; margin: 8px 0 10px; letter-spacing: -0.02em; }
+.tm-title-card h2 { text-wrap: balance; overflow-wrap: anywhere; font-family: var(--f-display); font-weight: 800; font-stretch: 108%; font-size: clamp(1.8rem, 4.6vw, 3.4rem); line-height: 1.05; margin: 8px 0 10px; letter-spacing: -0.02em; }
 .tm-title-card p { font-size: clamp(1.05rem, 2vw, 1.25rem); color: var(--tm-muted); max-width: 680px; margin: 8px auto; }
 .tm-kicker { color: var(--tm-accent); font-family: var(--mono); font-weight: 600; font-size: .8rem; letter-spacing: .1em; text-transform: uppercase; }
 .tm-hint { font-size: .9rem !important; }

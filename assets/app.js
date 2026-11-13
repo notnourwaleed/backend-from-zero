@@ -95,7 +95,7 @@
         h('div', { class: 'mc-node p' }, h('b', null, '🗄️'), h('span', null, 'MySQL')),
         h('span', { class: 'mc-packet' }, 'GET /users/3')),
       h('div', { class: 'mc-t-cap' },
-        h('span', { class: 'mc-av' }, '🧑‍🏫', h('i', { class: 'mc-eq' }, h('i'), h('i'), h('i'))),
+        h('span', { class: 'mc-av' }, h('img', { src: 'assets/teacher-avatar.webp', alt: '' }), h('i', { class: 'mc-eq' }, h('i'), h('i'), h('i'))),
         h('span', { class: 'mc-words' }, words.map((w, i) => h('span', { style: `animation-delay:${0.35 * i}s` }, w + ' ')))),
       h('div', { class: 'mc-t-ctl' }, h('i', { class: 'mc-btn' }, '⏮'), h('i', { class: 'mc-btn on' }, '⏸'), h('i', { class: 'mc-btn' }, '⏭'),
         h('span', { class: 'mc-dots' }, [0, 1, 2, 3, 4, 5, 6].map(i => h('i', { class: i < 2 ? 'done' : i === 2 ? 'on' : '' }))), h('i', { class: 'mc-btn' }, '🔊')));

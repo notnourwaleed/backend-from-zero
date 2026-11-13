@@ -42,7 +42,7 @@
     return svg ? h('span', { class: 'tm-ico ' + (cls || ''), html: svg }) : (emoji ? h('span', { class: 'tm-ico tm-ico-emoji ' + (cls || '') }, emoji) : null);
   };
   // the teacher's face: assets/teacher-avatar.png (falls back to a drawn person)
-  const AVATAR = 'assets/teacher-avatar.png';
+  const AVATAR = 'assets/teacher-avatar.webp';
   const avatarImg = (cls) => {
     const wrap = h('span', { class: 'tm-face ' + (cls || '') });
     const img = h('img', { src: AVATAR, alt: '', draggable: 'false' });
@@ -164,7 +164,7 @@
       lines.forEach(l => l.classList.remove('hl'));
       ls.forEach(n => { const l = lines[n - 1]; if (l) l.classList.add('hl'); });
       const first = lines[ls[0] - 1];
-      if (first) first.scrollIntoView({ block: 'nearest', behavior: REDUCE ? 'auto' : 'smooth' });
+      if (first) first.scrollIntoView({ block: 'nearest', inline: 'nearest', behavior: REDUCE ? 'auto' : 'smooth' });
       if (o.note) { note.hidden = false; note.classList.remove('tm-pop-in'); void note.offsetWidth; note.classList.add('tm-pop-in'); note.innerHTML = md(o.note); }
     }));
   };
@@ -324,7 +324,7 @@
       }
       if (op.hl) op.hl.forEach(i => { const r = row(i); if (r) r.classList.add('hl'); });
       if (op.only) $$('tr', tb).forEach(r => { const keep = op.only.includes(+r.dataset.i); r.classList.toggle('fade', !keep); r.classList.toggle('hl', keep); });
-      if (op.add) { const r = rowEl(op.add, tb.children.length + 100); r.classList.add('tm-row-new'); tb.append(r); r.scrollIntoView({ block: 'nearest', behavior: REDUCE ? 'auto' : 'smooth' }); }
+      if (op.add) { const r = rowEl(op.add, tb.children.length + 100); r.classList.add('tm-row-new'); tb.append(r); r.scrollIntoView({ block: 'nearest', inline: 'nearest', behavior: REDUCE ? 'auto' : 'smooth' }); }
       if (op.set) {
         const [ri, ci, v] = op.set; const r = row(ri);
         if (r && r.children[ci]) { const td = r.children[ci]; td.textContent = String(v); td.classList.remove('flash', 'flash-bad'); void td.offsetWidth; td.classList.add(op.bad ? 'flash-bad' : 'flash'); }
@@ -395,7 +395,7 @@
         const g2 = Math.min(380, (ctx.dur * 0.95 - tR) / Math.max(1, s.result.rows.length));
         s.result.rows.forEach((r, i) => ctx.after(200 + i * g2, () => {
           const tr = rowEl(r, i); tr.classList.add('tm-row-new'); tb.append(tr);
-          tr.scrollIntoView({ block: 'nearest', behavior: REDUCE ? 'auto' : 'smooth' });
+          tr.scrollIntoView({ block: 'nearest', inline: 'nearest', behavior: REDUCE ? 'auto' : 'smooth' });
         }));
       });
     }
@@ -817,6 +817,7 @@
     tick() {
       const a = this.audio, rec = this.curRec;
       if (!rec || !this.usingAudio) return;
+      const once = arguments[0] === 'once';
       const t = a.currentTime;
       let pos = 0;
       for (const [cs, ce, t0, t1] of rec.s) {
@@ -826,7 +827,7 @@
       }
       this.markWord(pos);
       if (rec.d) this.setProgress(Math.min(1, t / rec.d));
-      if (!a.paused && !a.ended) this.raf = requestAnimationFrame(() => this.tick());
+      if (!once && !a.paused && !a.ended) { cancelAnimationFrame(this.raf); this.raf = requestAnimationFrame(() => this.tick()); }
     }
     speak(text, rec, dur, done) {
       const token = ++this.token;
@@ -849,6 +850,8 @@
         a.src = rec.f;
         a.playbackRate = this.rate;
         a.onended = () => { if (token === this.token) finish(); };
+        // also follow the audio's own clock (keeps working when animation frames are paused, e.g. a background tab)
+        a.ontimeupdate = () => { if (token === this.token) this.tick('once'); };
         a.onerror = () => { if (token !== this.token) return; this.usingAudio = false; this.timeWords(0, text.length, dur * 0.95, token); this.after(dur, finish); };
         a.play().then(() => { this.notice.hidden = true; this.avatar.classList.add('speaking'); this.tick(); }).catch(() => {
           if (token !== this.token) return;
