@@ -249,40 +249,232 @@
   };
 
   const METHOD_TONE = { GET: 'g', POST: 'w', PUT: 'a', PATCH: 'p', DELETE: 'b' };
+  // Postman: one request, or several in a row (s.seq), with a pointer pressing Send
   R.postman = (st, s, ctx) => {
+    const reqs = s.seq || [s];
+    const method = h('span', { class: 'tm-pm-method' });
     const url = h('span', { class: 'tm-pm-url-text' });
+    const caret = h('span', { class: 'tm-caret' });
     const send = h('span', { class: 'tm-pm-send' }, 'Send');
-    const app = h('div', { class: 'tm-pm tm-rise' },
-      h('div', { class: 'tm-pm-top' }, h('span', { class: 'tm-pm-logo', html: (window.BFZ_ICONS || {}).postman || '' }), 'Postman', h('span', { class: 'tm-pm-tab' }, s.tab || 'Travel API')),
-      h('div', { class: 'tm-pm-bar' }, h('span', { class: 'tm-pm-method m-' + (METHOD_TONE[s.method] || 'g') }, s.method), h('span', { class: 'tm-pm-url' }, url, h('span', { class: 'tm-caret' })), send));
-    let bodyCode = null;
-    if (s.body) {
-      bodyCode = h('code', { class: 'tm-pm-body' });
-      app.append(h('div', { class: 'tm-pm-tabs' }, h('span', null, 'Params'), h('span', { class: 'on' }, 'Body'), h('span', null, 'Headers'), h('span', { class: 'tm-pm-raw' }, 'raw'), h('span', { class: 'tm-pm-json' }, 'JSON ▾')), h('pre', { class: 'tm-pm-bodybox' }, bodyCode));
-    }
+    const bodyCode = h('code', { class: 'tm-pm-body' });
+    const bodyWrap = h('div', { hidden: true }, h('div', { class: 'tm-pm-tabs' }, h('span', null, 'Params'), h('span', { class: 'on' }, 'Body'), h('span', null, 'Headers'), h('span', { class: 'tm-pm-raw' }, 'raw'), h('span', { class: 'tm-pm-json' }, 'JSON ▾')), h('pre', { class: 'tm-pm-bodybox' }, bodyCode));
     const resp = h('div', { class: 'tm-pm-resp', hidden: true });
-    app.append(resp);
-    st.append(app);
-    let t = 300;
-    const full = s.url;
-    for (let i = 1; i <= full.length; i++) ctx.after(t + i * 26, () => { url.textContent = full.slice(0, i); });
-    t += full.length * 26 + 300;
-    ctx.after(t, () => { const c = $('.tm-caret', app); if (c) c.remove(); });
-    if (s.body) {
-      const n = s.body.split('\n').length;
-      ctx.after(t, () => { bodyCode.innerHTML = splitHtmlLines(highlight(s.body, 'json')).map(l => `<div class="tm-line">${l || ' '}</div>`).join(''); typeLines($$('.tm-line', bodyCode), Math.min(2400, n * 500), 0); });
-      t += Math.min(2400, n * 500) + 500;
-    }
-    const sendAt = Math.max(t, ctx.dur * 0.45);
-    ctx.after(sendAt, () => send.classList.add('pressed'));
-    ctx.after(sendAt + 700, () => {
-      const code = parseInt(s.status, 10);
-      const tone = code >= 500 ? 'b' : code >= 400 ? 'w' : 'g';
-      resp.hidden = false; resp.innerHTML = '';
-      resp.append(h('div', { class: 'tm-pm-resp-head' }, 'Response', h('span', { class: 'tm-pill tone-' + tone + ' tm-pop' }, s.status), s.time ? h('span', { class: 'tm-pm-time' }, s.time) : null));
-      if (s.response) resp.append(h('pre', { class: 'tm-pm-resp-body tm-rise' }, h('code', { html: highlight(s.response, /^\s*[[{]/.test(s.response) ? 'json' : 'plain') })));
-      if (s.note) resp.append(h('div', { class: 'tm-pm-note tm-rise d2', html: md(s.note) }));
+    const counter = h('span', { class: 'tm-pm-tab' }, s.tab || 'Travel API');
+    const app = h('div', { class: 'tm-pm tm-rise' },
+      h('div', { class: 'tm-pm-top' }, h('span', { class: 'tm-pm-logo', html: (window.BFZ_ICONS || {}).postman || '' }), 'Postman', counter),
+      h('div', { class: 'tm-pm-bar' }, method, h('span', { class: 'tm-pm-url' }, url, caret), send),
+      bodyWrap, resp);
+    const box = h('div', { class: 'tm-screen-host' }, app);
+    st.append(box);
+    const ptr = pointer(box);
+    const span = (ctx.dur * 0.94 - 200) / reqs.length;
+    reqs.forEach((r, k) => {
+      const t0 = 200 + k * span;
+      ctx.after(t0, () => {
+        method.textContent = r.method; method.className = 'tm-pm-method m-' + (METHOD_TONE[r.method] || 'g');
+        url.textContent = ''; caret.hidden = false; resp.hidden = true; send.classList.remove('pressed');
+        bodyWrap.hidden = !r.body; bodyCode.innerHTML = '';
+        if (reqs.length > 1) counter.textContent = `Request ${k + 1} of ${reqs.length}`;
+      });
+      const typeMs = Math.min(span * 0.3, r.url.length * 26);
+      for (let i = 1; i <= r.url.length; i++) ctx.after(t0 + 100 + (i * typeMs) / r.url.length, () => { url.textContent = r.url.slice(0, i); });
+      let t = t0 + 150 + typeMs;
+      ctx.after(t, () => { caret.hidden = true; });
+      if (r.body) {
+        const n = r.body.split('\n').length;
+        const bMs = Math.min(span * 0.25, n * 450);
+        ctx.after(t, () => { bodyCode.innerHTML = splitHtmlLines(highlight(r.body, 'json')).map(l => `<div class="tm-line">${l || ' '}</div>`).join(''); typeLines($$('.tm-line', bodyCode), bMs, 0); });
+        t += bMs + 200;
+      }
+      const sendAt = Math.max(t + 250, t0 + span * 0.45);
+      ctx.after(sendAt - 700, () => ptr.move(send));
+      ctx.after(sendAt, () => { ptr.click(); send.classList.remove('pressed'); void send.offsetWidth; send.classList.add('pressed'); });
+      ctx.after(sendAt + 550, () => {
+        const code = parseInt(r.status, 10);
+        const tone = code >= 500 ? 'b' : code >= 400 ? 'w' : 'g';
+        resp.hidden = false; resp.innerHTML = '';
+        resp.append(h('div', { class: 'tm-pm-resp-head' }, 'Response', h('span', { class: 'tm-pill tone-' + tone + ' tm-pop' }, r.status), r.time ? h('span', { class: 'tm-pm-time' }, r.time) : null));
+        if (r.response) resp.append(h('pre', { class: 'tm-pm-resp-body tm-rise' }, h('code', { html: highlight(r.response, /^\s*[[{]/.test(r.response) ? 'json' : 'plain') })));
+        if (r.note) resp.append(h('div', { class: 'tm-pm-note tm-rise d2', html: md(r.note) }));
+        ptr.move(resp, 0.15, 0.2);
+      });
     });
+  };
+
+  // ---------------------------------------------------------------- the pointer (mouse cursor)
+  function pointer(host) {
+    host.classList.add('tm-screen-host');
+    const p = h('div', { class: 'tm-ptr', html: '<svg viewBox="0 0 24 24"><path d="M4 2l16 11-7 1.5L16.5 22l-3 1.2-3.3-7.4L4 20z" fill="#fff" stroke="#0A0F13" stroke-width="1.5" stroke-linejoin="round"/></svg>' });
+    host.append(p);
+    let shown = false;
+    return {
+      move(el, fx = 0.5, fy = 0.55) {
+        if (!el) return;
+        const r = el.getBoundingClientRect(), b = host.getBoundingClientRect();
+        const x = r.left - b.left + r.width * fx, y = r.top - b.top + r.height * fy;
+        if (!shown) { p.style.transition = 'none'; p.style.left = (x + 60) + 'px'; p.style.top = (y + 50) + 'px'; void p.offsetWidth; shown = true; p.classList.add('on'); }
+        p.style.transition = REDUCE ? 'none' : 'left .65s cubic-bezier(.4,0,.2,1), top .65s cubic-bezier(.4,0,.2,1)';
+        p.style.left = x + 'px'; p.style.top = y + 'px';
+      },
+      click() { p.classList.remove('click'); void p.offsetWidth; p.classList.add('click'); },
+      hide() { p.classList.remove('on'); shown = false; },
+    };
+  }
+
+  // ---------------------------------------------------------------- app screens (VS Code, browser, installer, desktop, lesson)
+  const APPICON = {
+    vscode: '<svg viewBox="0 0 64 64"><rect width="64" height="64" rx="14" fill="#1F2933"/><path d="M44 10l10 5v34l-10 5-22-20-9 7-5-3V26l5-3 9 7z" fill="#2F8DDB"/><path d="M44 22L30 32l14 10z" fill="#1F2933"/></svg>',
+    terminal: '<svg viewBox="0 0 64 64"><rect width="64" height="64" rx="14" fill="#0E151A" stroke="#3B4A55" stroke-width="2"/><path d="M16 24l9 8-9 8" fill="none" stroke="#3FBC7B" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/><rect x="30" y="38" width="16" height="4" rx="2" fill="#C7D2D8"/></svg>',
+    node: '<svg viewBox="0 0 64 64"><rect width="64" height="64" rx="14" fill="#1F2933"/><path d="M32 10l19 11v22L32 54 13 43V21z" fill="#3FA34D"/><text x="32" y="38" font-family="Arial" font-weight="700" font-size="13" fill="#fff" text-anchor="middle">JS</text></svg>',
+    npm: '<svg viewBox="0 0 64 64"><rect width="64" height="64" rx="14" fill="#CB3837"/><text x="32" y="39" font-family="Arial" font-weight="800" font-size="17" fill="#fff" text-anchor="middle">npm</text></svg>',
+    mysql: '<svg viewBox="0 0 64 64"><rect width="64" height="64" rx="14" fill="#1F2933"/><ellipse cx="32" cy="20" rx="16" ry="6" fill="#3E8BC4"/><path d="M16 20v24c0 3.3 7.2 6 16 6s16-2.7 16-6V20" fill="#00618A"/><ellipse cx="32" cy="20" rx="16" ry="6" fill="#4FA3DB"/><path d="M16 32c0 3.3 7.2 6 16 6s16-2.7 16-6" fill="none" stroke="#4FA3DB" stroke-width="2"/></svg>',
+    workbench: '<svg viewBox="0 0 64 64"><rect width="64" height="64" rx="14" fill="#00618A"/><rect x="12" y="16" width="40" height="30" rx="3" fill="#E4ECEF"/><rect x="12" y="16" width="40" height="7" fill="#F29111"/><rect x="17" y="28" width="20" height="3" rx="1.5" fill="#5A6B76"/><rect x="17" y="35" width="28" height="3" rx="1.5" fill="#5A6B76"/></svg>',
+    postman: '<svg viewBox="0 0 64 64"><rect width="64" height="64" rx="14" fill="#FF6C37"/><path d="M18 24h28v18H18z" fill="#fff"/><path d="M18 24l14 11 14-11" fill="none" stroke="#FF6C37" stroke-width="2.4"/></svg>',
+    folder: '<svg viewBox="0 0 64 64"><path d="M6 16a4 4 0 0 1 4-4h14l5 5h25a4 4 0 0 1 4 4v29a4 4 0 0 1-4 4H10a4 4 0 0 1-4-4z" fill="#F2B33D"/></svg>',
+  };
+  const SCREEN = {
+    vscode(o) {
+      const files = (o.files || []).map(f => h('li', { 'data-t': 'f-' + f.replace(/[^\w]/g, '_'), class: f.endsWith('/') ? 'dir' : '' }, f.endsWith('/') ? '▸ ' + f.slice(0, -1) : f));
+      return h('div', { class: 'tmv tmv-vscode' },
+        h('div', { class: 'tmv-titlebar' }, h('span', { class: 'tmv-appico', html: APPICON.vscode }),
+          ...['File', 'Edit', 'Selection', 'View', 'Go', 'Terminal', 'Help'].map(m => h('span', { class: 'tmv-menu', 'data-t': 'menu-' + m.toLowerCase() }, m)),
+          h('span', { class: 'tmv-wintitle', 'data-t': 'wintitle' }, o.title || 'Visual Studio Code')),
+        h('div', { class: 'tmv-dd', 'data-t': 'dd-file', hidden: true },
+          h('div', { 'data-t': 'dd-newfile' }, 'New Text File', h('i', null, 'Ctrl+N')), h('div', { 'data-t': 'dd-openfolder' }, 'Open Folder…', h('i', null, 'Ctrl+K Ctrl+O')),
+          h('hr'), h('div', { 'data-t': 'dd-save' }, 'Save', h('i', null, 'Ctrl+S')), h('div', { 'data-t': 'dd-autosave' }, 'Auto Save')),
+        h('div', { class: 'tmv-body' },
+          h('div', { class: 'tmv-actbar' }, h('i', { class: 'on', 'data-t': 'act-explorer' }, '❐'), h('i', null, '⌕'), h('i', null, '⑂'), h('i', { 'data-t': 'act-ext' }, '⊞')),
+          h('div', { class: 'tmv-side' },
+            h('div', { class: 'tmv-side-h' }, 'EXPLORER'),
+            h('div', { class: 'tmv-folder' }, h('span', { 'data-t': 'folder' }, o.folder || 'NO FOLDER OPENED'),
+              h('span', { class: 'tmv-tools' }, h('i', { 'data-t': 'btn-newfile', title: 'New File' }, '📄+'), h('i', { 'data-t': 'btn-newfolder', title: 'New Folder' }, '📁+'))),
+            h('ul', { class: 'tmv-files', 'data-t': 'files' }, files)),
+          h('div', { class: 'tmv-main' },
+            h('div', { class: 'tmv-tabs', 'data-t': 'tabs' }, h('span', { class: 'tmv-tab', 'data-t': 'tab', hidden: !o.tab }, h('span', { 'data-t': 'tabname' }, o.tab || ''), h('i', { class: 'tmv-dot', 'data-t': 'dot', hidden: true }, '●'))),
+            h('div', { class: 'tmv-editor', 'data-t': 'editor' }, o.code ? codeBlock(o.code, o.lang) : h('div', { class: 'tmv-welcome', 'data-t': 'welcome' }, h('span', { html: APPICON.vscode }), 'Open a folder to start')),
+            h('div', { class: 'tmv-panel', 'data-t': 'panel', hidden: !o.terminal }, h('div', { class: 'tmv-panel-h' }, h('b', null, 'TERMINAL'), h('span', null, 'powershell')), h('div', { class: 'tmv-term', 'data-t': 'term' })))),
+        h('div', { class: 'tmv-status' }, h('span', null, '⊗ 0  ⚠ 0'), h('span', { 'data-t': 'statusmsg' }, ''), h('span', null, 'JavaScript')));
+    },
+    browser(o) {
+      return h('div', { class: 'tmv tmv-browser' },
+        h('div', { class: 'tmv-chrome' }, h('i'), h('i'), h('i'), h('span', { class: 'tmv-url', 'data-t': 'url' }, '🔒 ' + (o.url || ''))),
+        h('div', { class: 'tmv-page', 'data-t': 'page', html: o.html || '' }));
+    },
+    installer(o) {
+      return h('div', { class: 'tmv tmv-installer' },
+        h('div', { class: 'tmv-inst-title' }, h('span', { html: APPICON[o.icon || 'node'] }), o.title || 'Setup'),
+        h('div', { class: 'tmv-inst-body' }, h('h4', { 'data-t': 'heading' }, o.heading || ''), h('p', { 'data-t': 'text' }, o.text || ''),
+          h('div', { class: 'tmv-progress', 'data-t': 'progress', hidden: true }, h('i', { 'data-t': 'bar' }))),
+        h('div', { class: 'tmv-inst-btns' }, h('span', { 'data-t': 'back' }, 'Back'), h('span', { class: 'primary', 'data-t': 'next' }, 'Next'), h('span', { 'data-t': 'cancel' }, 'Cancel')));
+    },
+    desktop(o) {
+      return h('div', { class: 'tmv tmv-desktop' },
+        h('div', { class: 'tmv-icons', 'data-t': 'icons' }, (o.apps || []).map(a => h('div', { class: 'tmv-app', 'data-t': 'app-' + a.id, hidden: true }, h('span', { html: APPICON[a.icon] }), h('b', null, a.name), h('small', null, a.what)))),
+        h('div', { class: 'tmv-taskbar' }, h('span', { class: 'tmv-start' }, '⊞'), h('span', { class: 'tmv-search' }, '🔍 Search'), h('span', { 'data-t': 'tray', class: 'tmv-tray' })));
+    },
+    lesson(o) {
+      return h('div', { class: 'tmv tmv-lesson' },
+        h('div', { class: 'tmv-l-stage', 'data-t': 'stage' },
+          h('div', { class: 'tmv-l-flow', 'data-t': 'flow' }, h('span', null, '🧑‍💻'), h('i'), h('span', null, '🧭'), h('i'), h('span', null, '⚙️'), h('b', { class: 'tmv-l-dot' })),
+          h('div', { class: 'tmv-l-ex', 'data-t': 'ex', hidden: true },
+            h('div', { class: 'tmv-l-wait', 'data-t': 'wait' }, '⏳ Your turn! I\'ll continue when it is correct.'),
+            h('pre', { class: 'tmv-l-code', 'data-t': 'code' }, ''),
+            h('div', { class: 'tmv-l-row' }, h('span', { class: 'tmv-l-run', 'data-t': 'run' }, '▶ Run'), h('span', { class: 'tmv-l-checks', 'data-t': 'checks' }, '0 / 3 checks pass')))),
+        h('div', { class: 'tmv-l-cap' }, h('span', { class: 'tmv-l-face' }, h('img', { src: AVATAR, alt: '' })), h('span', { 'data-t': 'cap' }, o.cap || '')));
+    },
+  };
+
+  // run a little script of actions on a fake app window, spread over the narration
+  R.screen = (st, s, ctx) => {
+    const host = h('div', { class: 'tm-screen-host tm-rise' });
+    st.append(host);
+    let win = null;
+    const T = (name) => win && win.querySelector(`[data-t="${name}"]`);
+    const ptr = pointer(host);
+    const keycap = h('div', { class: 'tm-keycap', hidden: true });
+    const tip = h('div', { class: 'tm-tip', hidden: true });
+    host.append(keycap, tip);
+    const showWin = (o) => {
+      const next = SCREEN[o.app](o);
+      if (win) { win.classList.add('tmv-out'); const old = win; ctx.after(300, () => old.remove()); }
+      host.prepend(next); win = next; next.classList.add('tmv-in');
+    };
+    const tipAt = (el, text) => {
+      if (!el || !text) { tip.hidden = true; return; }
+      const r = el.getBoundingClientRect(), b = host.getBoundingClientRect();
+      tip.innerHTML = md(text); tip.hidden = false;
+      tip.style.left = Math.min(b.width - 200, Math.max(8, r.left - b.left)) + 'px';
+      tip.style.top = (r.bottom - b.top + 10) + 'px';
+      tip.classList.remove('tm-pop'); void tip.offsetWidth; tip.classList.add('tm-pop');
+      const mine = ++tipN;
+      ctx.after(2600, () => { if (mine === tipN) tip.hidden = true; });
+    };
+    let tipN = 0;
+    const BASE = { win: 500, point: 900, click: 1000, type: 0, key: 1300, show: 350, hide: 200, set: 300, append: 450, code: 900, hl: 1400, term: 0, cls: 300, wait: 600, tip: 1200 };
+    const cost = a => {
+      const k = Object.keys(a).find(x => BASE[x] !== undefined);
+      if (a.type) return 300 + String(a.text || '').length * 60;
+      if (a.term) return 500 + String(a.term).length * 40 + (a.out ? 450 : 0);
+      if (a.ms) return a.ms;
+      return BASE[k] || 500;
+    };
+    const steps = s.steps || [];
+    const total = steps.reduce((x, a) => x + cost(a), 0);
+    const scale = Math.max(0.55, Math.min(1.7, (ctx.dur * 0.92) / Math.max(1, total)));
+    let t = 0;
+    steps.forEach(a => {
+      const c = cost(a) * scale;
+      ctx.after(t, () => {
+        if (a.win) { showWin(a.win); ptr.hide(); tip.hidden = true; return; }
+        if (a.point) { ptr.move(T(a.point), a.fx, a.fy); if (a.say) ctx.after(600 * scale, () => tipAt(T(a.point), a.say)); }
+        if (a.click) {
+          const el = T(a.click);
+          ptr.move(el, a.fx, a.fy);
+          ctx.after(650 * scale, () => { ptr.click(); if (el) { el.classList.remove('tmv-pressed'); void el.offsetWidth; el.classList.add('tmv-pressed'); } if (a.say) tipAt(el, a.say); (a.then || []).forEach(run); });
+          return;
+        }
+        if (a.type) {
+          const el = T(a.type); if (!el) return;
+          const text = String(a.text); el.classList.add('tmv-typing');
+          for (let i = 1; i <= text.length; i++) ctx.after(i * 60 * scale, () => { el.textContent = text.slice(0, i); });
+          ctx.after((text.length * 60 + 200) * scale, () => el.classList.remove('tmv-typing'));
+        }
+        if (a.term) {
+          const el = T('term'); if (!el) return;
+          const row = h('div', null, h('span', { class: 'tm-prompt' }, (s.prompt || 'PS C:\\Users\\you\\my-backend>') + ' '), h('span'));
+          el.append(row);
+          const out = row.lastChild, text = a.term;
+          for (let i = 1; i <= text.length; i++) ctx.after(i * 40 * scale, () => { out.textContent = text.slice(0, i); });
+          if (a.out) ctx.after((text.length * 40 + 350) * scale, () => [].concat(a.out).forEach(o => el.append(h('div', { class: 'tm-term-out ' + (a.tone || '') }, o))));
+        }
+        if (a.key) {
+          keycap.innerHTML = a.key.split('+').map(k => `<kbd>${esc(k.trim())}</kbd>`).join('<span>+</span>');
+          keycap.hidden = false; keycap.classList.remove('tm-pop'); void keycap.offsetWidth; keycap.classList.add('tm-pop');
+          ctx.after(1000 * scale, () => { keycap.hidden = true; (a.then || []).forEach(run); });
+          return;
+        }
+        if (a.tip !== undefined) tipAt(T(a.tip), a.text);
+        run(a);
+      });
+      t += c;
+    });
+    function run(a) {
+      if (a.show) [].concat(a.show).forEach(n => { const el = T(n); if (el) { el.hidden = false; el.classList.remove('tm-pop'); void el.offsetWidth; el.classList.add('tm-pop'); } });
+      if (a.hide) [].concat(a.hide).forEach(n => { const el = T(n); if (el) el.hidden = true; });
+      if (a.set) { const el = T(a.set); if (el) { el.textContent = a.text; el.classList.remove('tmv-flash'); void el.offsetWidth; el.classList.add('tmv-flash'); } }
+      if (a.append) { const el = T(a.append); if (el) { const n = h('div', { html: a.html }).firstElementChild; n.classList.add('tm-pop'); el.append(n); } }
+      if (a.cls) { const el = T(a.cls); if (el) el.classList.add(a.add); }
+      if (a.uncls) { const el = T(a.uncls); if (el) el.classList.remove(a.remove); }
+      if (a.code !== undefined) {
+        const ed = T('editor'); if (ed) { ed.innerHTML = ''; const pre = codeBlock(a.code, a.lang); ed.append(pre); if (a.typed !== false) typeLines($$('.tm-line', pre), Math.min(2600, a.code.length * 22), 0); }
+      }
+      if (a.hl) {
+        const ed = T('editor'); if (!ed) return;
+        $$('.tm-line', ed).forEach(l => l.classList.toggle('hl', [].concat(a.hl).includes(+l.dataset.n)));
+        const first = $(`.tm-line[data-n="${[].concat(a.hl)[0]}"]`, ed);
+        if (first && a.say) tipAt(first, a.say);
+      }
+    }
   };
 
   function miniTable(t) {
